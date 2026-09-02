@@ -24,8 +24,8 @@ export function AppNav() {
           Gym<span className="text-accent">Log</span>
         </Link>
 
-        {/* Desktop links */}
-        <div className="hidden sm:flex space-x-4">
+        {/* Desktop links – show on medium screens and up */}
+        <div className="hidden md:flex space-x-4">
           {links.map((link) => {
             const active = pathname === link.href;
             return (
@@ -42,9 +42,9 @@ export function AppNav() {
           })}
         </div>
 
-        {/* Mobile menu button */}
+        {/* Mobile menu button – show on small screens */}
         <button
-          className="sm:hidden rounded p-2 text-foreground hover:bg-white/5"
+          className="md:hidden rounded p-2 text-foreground hover:bg-white/5"
           onClick={() => setMenuOpen((o) => !o)}
           aria-label="Toggle menu"
         >
@@ -60,7 +60,7 @@ export function AppNav() {
 
         {/* Mobile dropdown */}
         {menuOpen && (
-          <div className="absolute left-0 top-14 w-full bg-background border-b border-white/10 sm:hidden z-10">
+          <div className="absolute left-0 top-14 w-full bg-background border-b border-white/10 md:hidden z-10">
             <div className="flex flex-col space-y-1 p-2">
               {links.map((link) => {
                 const active = pathname === link.href;

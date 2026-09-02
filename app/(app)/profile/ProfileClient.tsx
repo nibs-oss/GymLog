@@ -18,22 +18,47 @@ function ProfileClient({
   const [reminders, setReminders] = useState(initialSettings.rest_day_reminders);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const supabase = createBrowserClient();
 
   const saveSettings = async () => {
     setSaving(true);
-    const { error } = await supabase
+    setSaveError(null);
+    console.log("Saving settings payload:", { units, weekly_goal: weeklyGoal, rest_day_reminders: reminders });
+    // Get current user id for upsert
+    const { data: { user }, error: userErr } = await supabase.auth.getUser();
+    if (userErr) {
+      console.error("Failed to get user:", userErr);
+      setSaveError(userErr.message ?? "Failed to get user");
+      setSaving(false);
+      return;
+    }
+    if (!user) {
+      console.error("No authenticated user");
+      setSaveError("Not authenticated");
+      setSaving(false);
+      return;
+    }
+    const payload = {
+      user_id: user.id,
+      units,
+      weekly_goal: weeklyGoal,
+      rest_day_reminders: reminders,
+    };
+    console.log("Upserting with payload:", payload);
+    const { data, error } = await supabase
       .from("user_settings")
-      .upsert({
-        units,
-        weekly_goal: weeklyGoal,
-        rest_day_reminders: reminders,
-      });
+      .upsert(payload, { onConflict: "user_id" })
+      .select();
+    console.log("Supabase upsert response data:", data, "error:", error);
     setSaving(false);
     if (!error) {
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
+    } else {
+      setSaveError(error.message ?? "Failed to save settings");
+      console.error("Error updating settings:", error);
     }
   };
 
@@ -87,6 +112,7 @@ function ProfileClient({
             {saving ? "Saving…" : "Save"}
           </button>
           {saved && <span className="ml-2 text-sm text-green-400">Saved</span>}
+          {saveError && <p className="mt-2 text-sm text-red-400">{saveError}</p>}
         </div>
       </div>
 

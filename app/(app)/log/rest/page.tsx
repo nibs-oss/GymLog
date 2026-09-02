@@ -1,4 +1,5 @@
 import { createClient as createServerClient } from "@/utils/supabase/server";
+import Link from "next/link";
 
 export default async function RestDayPage() {
   const supabase = await createServerClient();
@@ -29,9 +30,9 @@ export default async function RestDayPage() {
       <section className="flex min-h-screen items-center justify-center px-4 py-8">
         <div className="rounded-lg border border-white/10 bg-zinc-900/60 p-8 text-center">
           <p className="text-zinc-400">You have already logged a session for today.</p>
-          <a href="/" className="mt-4 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black hover:bg-accent/90">
+          <Link href="/" className="mt-4 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black hover:bg-accent/90">
             Back to Home
-          </a>
+          </Link>
         </div>
       </section>
     );
@@ -52,9 +53,9 @@ export default async function RestDayPage() {
     <section className="flex min-h-screen items-center justify-center px-4 py-8">
       <div className="rounded-lg border border-white/10 bg-zinc-900/60 p-8 text-center">
         <p className="text-zinc-400">Rest day logged for today.</p>
-        <a href="/" className="mt-4 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black hover:bg-accent/90">
+        <Link href="/" className="mt-4 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black hover:bg-accent/90">
           Back to Home
-        </a>
+        </Link>
       </div>
     </section>
   );
