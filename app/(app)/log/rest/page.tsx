@@ -1,5 +1,4 @@
 import { createClient as createServerClient } from "@/utils/supabase/server";
-import { useRouter } from "next/navigation";
 
 export default async function RestDayPage() {
   const supabase = await createServerClient();
