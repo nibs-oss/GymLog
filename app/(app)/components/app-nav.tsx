@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LogoutButton } from "@/components/logout-button";
 import { useState } from "react";
 
 const links = [
@@ -20,11 +19,22 @@ export function AppNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-background/80 backdrop-blur">
       <nav className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-        <Link href="/" className="text-base font-bold tracking-tight">
-          Gym<span className="text-accent">Log</span>
-        </Link>
+        {/* Mobile menu button */}
+        <button
+          className="md:hidden rounded p-2 text-foreground hover:bg-white/5"
+          onClick={() => setMenuOpen((o) => !o)}
+          aria-label="Toggle menu"
+        >
+          <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
+            <path
+              fillRule="evenodd"
+              d="M3 5h14a1 1 0 010 2H3a1 1 0 110-2zm0 4h14a1 1 0 010 2H3a1 1 0 110-2zm0 4h14a1 1 0 010 2H3a1 1 0 110-2z"
+              clipRule="evenodd"
+            />
+          </svg>
+        </button>
 
-        {/* Desktop links – show on medium screens and up */}
+        {/* Desktop links */}
         <div className="hidden md:flex space-x-4">
           {links.map((link) => {
             const active = pathname === link.href;
@@ -41,22 +51,6 @@ export function AppNav() {
             );
           })}
         </div>
-
-        {/* Mobile menu button – show on small screens */}
-        <button
-          className="md:hidden rounded p-2 text-foreground hover:bg-white/5"
-          onClick={() => setMenuOpen((o) => !o)}
-          aria-label="Toggle menu"
-        >
-          {/* Simple hamburger icon */}
-          <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
-            <path
-              fillRule="evenodd"
-              d="M3 5h14a1 1 0 010 2H3a1 1 0 110-2zm0 4h14a1 1 0 010 2H3a1 1 0 110-2zm0 4h14a1 1 0 010 2H3a1 1 0 110-2z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
 
         {/* Mobile dropdown */}
         {menuOpen && (
@@ -77,9 +71,6 @@ export function AppNav() {
                   </Link>
                 );
               })}
-              <div className="border-t border-white/10 pt-1">
-                <LogoutButton />
-              </div>
             </div>
           </div>
         )}
