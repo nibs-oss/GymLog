@@ -17,6 +17,12 @@ export const metadata: Metadata = {
   description: "Track your workouts, routines, and progress.",
 };
 
+// Next.js viewport configuration – ensures proper mobile scaling
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: {

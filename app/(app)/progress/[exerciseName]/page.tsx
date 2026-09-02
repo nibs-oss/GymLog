@@ -88,5 +88,13 @@ export default async function ExerciseDetailPage({
     );
   }
 
-  return <DetailClient name={decodedName} records={data.records} pb={data.pb} />;
+  return (
+    <section className="space-y-6 p-4">
+      {/* Back link */}
+      <Link href="/progress" className="inline-block mb-2 text-sm text-zinc-400 hover:underline">
+        ← Back to Progress
+      </Link>
+      <DetailClient name={decodedName} records={data.records} pb={data.pb} />
+    </section>
+  );
 }
