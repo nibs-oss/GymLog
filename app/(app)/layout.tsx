@@ -1,0 +1,14 @@
+import { AppNav } from "@/components/app-nav";
+
+export default function AppLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <>
+      <AppNav />
+      <main className="mx-auto w-full max-w-5xl px-4 py-8">{children}</main>
+    </>
+  );
+}
