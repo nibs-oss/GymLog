@@ -8,7 +8,10 @@ export default function AppLayout({
   return (
     <>
       <AppNav />
-      <main className="mx-auto w-full max-w-5xl px-4 py-8">{children}</main>
+      {/* Bottom padding leaves room for the phone tab bar + iPhone home indicator */}
+      <main className="mx-auto w-full max-w-5xl px-4 pt-6 pb-[calc(6rem+env(safe-area-inset-bottom))] md:py-8">
+        {children}
+      </main>
     </>
   );
 }

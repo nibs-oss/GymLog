@@ -1,4 +1,5 @@
 import { createClient as createServerClient } from "@/utils/supabase/server";
+import Link from "next/link";
 import RoutineDetailClient from "./RoutineDetailClient";
 
 // Types for data returned from Supabase
@@ -14,6 +15,7 @@ interface Exercise {
   position: number;
   default_sets: number;
   default_reps: number;
+  muscle_group: string | null;
 }
 
 /** Fetch routine and its exercises, ensuring the routine belongs to the logged‑in user */
@@ -39,7 +41,7 @@ async function fetchRoutine(id: string): Promise<{
 
   const { data: exercises, error: exError } = await supabase
     .from("routine_exercises")
-    .select("id, name, position, default_sets, default_reps")
+    .select("id, name, position, default_sets, default_reps, muscle_group")
     .eq("routine_id", routine.id)
     .order("position", { ascending: true });
 
@@ -63,17 +65,17 @@ export default async function RoutineDetailPage({
     // Render a simple not‑found UI (server‑side only)
     return (
       <section className="flex min-h-screen items-center justify-center px-4 py-8">
-        <div className="rounded-lg border border-white/10 bg-zinc-900/60 p-8 text-center">
+        <div className="rounded-lg border border-white/10 bg-slate-900/60 p-8 text-center">
           <h1 className="text-2xl font-semibold text-foreground">Routine not found</h1>
-          <p className="mt-4 text-zinc-400">
+          <p className="mt-4 text-slate-400">
             The routine either does not exist or you don&#39;t have access to it.
           </p>
-          <a
+          <Link
             href="/routines"
-            className="mt-6 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black hover:bg-accent/90"
+            className="mt-6 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-slate-950 hover:bg-accent/90"
           >
             Back to Routines
-          </a>
+          </Link>
         </div>
       </section>
     );

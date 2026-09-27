@@ -43,12 +43,12 @@ function RoutineCard({ routine }: { routine: { id: string; name: string; created
   return (
     <Link
       href={`/routines/${routine.id}`}
-      className="group block rounded-lg border border-white/10 bg-zinc-900/60 p-4 transition-colors hover:border-accent hover:bg-zinc-800/80"
+      className="group block rounded-lg border border-white/10 bg-slate-900/60 p-4 transition-colors hover:border-accent hover:bg-slate-800/80"
     >
       <h2 className="text-lg font-medium text-foreground group-hover:text-accent">
         {routine.name}
       </h2>
-      <p className="mt-1 text-sm text-zinc-400">
+      <p className="mt-1 text-sm text-slate-400">
         {routine.exerciseCount} {routine.exerciseCount === 1 ? "exercise" : "exercises"}
       </p>
     </Link>
@@ -64,18 +64,18 @@ export default async function RoutinesPage() {
         <h1 className="text-2xl font-semibold tracking-tight text-foreground">Routines</h1>
         <Link
           href="/routines/new"
-          className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black hover:bg-accent/90"
+          className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-slate-950 hover:bg-accent/90"
         >
           Create Routine
         </Link>
       </div>
 
       {routines.length === 0 ? (
-        <div className="rounded-lg border border-white/10 bg-zinc-900/60 p-8 text-center">
-          <p className="text-zinc-400">You don’t have any routines yet.</p>
+        <div className="rounded-lg border border-white/10 bg-slate-900/60 p-8 text-center">
+          <p className="text-slate-400">You don’t have any routines yet.</p>
           <Link
             href="/routines/new"
-            className="mt-4 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black hover:bg-accent/90"
+            className="mt-4 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-slate-950 hover:bg-accent/90"
           >
             Create your first routine
           </Link>

@@ -1,95 +1,120 @@
-import { createClient as createServerClient } from "@/utils/supabase/server";
 import Link from "next/link";
+import { createClient as createServerClient } from "@/utils/supabase/server";
+import { fetchLoggedSets, summariseByExercise } from "@/lib/history";
+import { getUserSettings } from "@/lib/settings";
+import { estimate1RM, localIsoDate, weekStartIso } from "@/lib/fitness";
+import { exerciseKey, libraryMuscle } from "@/lib/exercises";
+import { formatWeight } from "@/lib/units";
+import MuscleVolume from "./MuscleVolume";
 
-interface ExerciseStat {
-  name: string;
-  pb: number | null; // personal best weight
-  count: number; // number of sessions logged
-}
-
-/** Fetch distinct exercises for the user with PB */
-async function fetchExerciseStats() {
+async function fetchProgress() {
   const supabase = await createServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return [];
+  if (!user) return null;
 
-  // Fetch session_exercises for this user (join via workout_sessions)
-  const { data: sesEx } = await supabase
-    .from("session_exercises")
-    .select("id, name, workout_sessions!inner(user_id)")
-    .eq("workout_sessions.user_id", user.id);
+  const [rows, settings] = await Promise.all([
+    fetchLoggedSets(supabase, user.id),
+    getUserSettings(supabase, user.id),
+  ]);
 
-  if (!sesEx || sesEx.length === 0) return [];
-
-  // Group by exercise name and collect session_exercise ids
-  const groups: Record<string, { ids: string[]; count: number }> = {};
-  for (const row of sesEx as any[]) {
-    const name: string = row.name;
-    if (!groups[name]) {
-      groups[name] = { ids: [], count: 0 };
-    }
-    groups[name].ids.push(row.id);
-    groups[name].count++;
+  const summaries = summariseByExercise(rows);
+  const best1RM = new Map<string, number>();
+  for (const r of rows) {
+    const e = estimate1RM(r.weight, r.reps);
+    const k = exerciseKey(r.exercise);
+    if (e !== null && e > (best1RM.get(k) ?? 0)) best1RM.set(k, e);
   }
 
-  // Fetch all sets for the collected session_exercise ids
-  const allIds = Object.values(groups).flatMap((g) => g.ids);
-  const { data: setRows } = await supabase
-    .from("sets")
-    .select("weight, session_exercise_id")
-    .in("session_exercise_id", allIds);
+  const exercises = [...summaries.entries()]
+    .map(([key, s]) => ({ ...s, best1RM: best1RM.get(key) ?? null }))
+    .sort((a, b) => ((b.lastDate ?? "") < (a.lastDate ?? "") ? -1 : 1));
 
-  // Compute PB per exercise name
-  const stats: ExerciseStat[] = [];
-  for (const [name, { ids, count }] of Object.entries(groups)) {
-    const weights = setRows
-      ?.filter((s: any) => ids.includes(s.session_exercise_id))
-      .map((s: any) => s.weight)
-      .filter((w: any) => w !== null && w !== undefined) as number[];
-    const pb = weights && weights.length > 0 ? Math.max(...weights) : null;
-    stats.push({ name, pb, count });
+  // Hard sets per muscle group for the last 4 weeks (Mon-based), newest first
+  const weeks: string[] = [];
+  const cursor = new Date();
+  for (let i = 0; i < 4; i++) {
+    weeks.push(weekStartIso(cursor));
+    cursor.setDate(cursor.getDate() - 7);
   }
+  const oldest = weeks[weeks.length - 1];
+  const muscleSets = rows
+    .filter((r) => r.date >= oldest)
+    .map((r) => ({
+      date: r.date,
+      muscle: r.muscle ?? libraryMuscle(r.exercise) ?? "Other",
+    }));
 
-  // Sort by PB descending (nulls last)
-  stats.sort((a, b) => (b.pb ?? 0) - (a.pb ?? 0));
-  return stats;
+  return { exercises, units: settings.units, weeks, muscleSets, today: localIsoDate() };
 }
 
 export default async function ProgressPage() {
-  const stats = await fetchExerciseStats();
-  const hasData = stats.length > 0;
+  const data = await fetchProgress();
+  if (!data) return null;
+  const { exercises, units, weeks, muscleSets, today } = data;
 
   return (
-    <section className="space-y-6 p-4">
-      <h1 className="text-2xl font-semibold tracking-tight">Progress</h1>
-      {hasData ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {stats.map((ex) => (
-            <Link
-              key={ex.name}
-              href={`/progress/${encodeURIComponent(ex.name)}`}
-              className="group block rounded-lg border border-white/10 bg-zinc-900/60 p-4 transition-colors hover:border-accent hover:bg-zinc-800/80"
-            >
-              <h2 className="text-lg font-medium text-foreground group-hover:text-accent">
-                {ex.name}
-              </h2>
-              <p className="mt-1 text-sm text-zinc-400">PB: {ex.pb ?? "N/A"} kg</p>
-              <p className="mt-1 text-sm text-zinc-400">Logged in {ex.count} sessions</p>
-            </Link>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-white/10 bg-zinc-900/60 p-8 text-center">
-          <p className="text-zinc-400">No exercises logged yet. Start by logging a workout.</p>
+    <section className="space-y-6">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold tracking-tight">Progress</h1>
+        <Link
+          href="/bodyweight"
+          className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium hover:bg-white/5"
+        >
+          ⚖ Bodyweight
+        </Link>
+      </div>
+
+      {exercises.length === 0 ? (
+        <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-center">
+          <p className="text-slate-400">No exercises logged yet. Start by logging a workout.</p>
           <Link
             href="/log"
-            className="mt-4 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black hover:bg-accent/90"
+            className="mt-4 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-slate-950 hover:bg-accent/90"
           >
             Log Workout
           </Link>
         </div>
+      ) : (
+        <>
+          <MuscleVolume weeks={weeks} sets={muscleSets} today={today} />
+
+          <div className="space-y-3">
+            <h2 className="text-lg font-medium text-foreground">Exercises</h2>
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {exercises.map((ex) => (
+                <Link
+                  key={ex.name}
+                  href={`/progress/${encodeURIComponent(ex.name)}`}
+                  className="group block rounded-2xl border border-white/10 bg-slate-900/60 p-4 transition-colors hover:border-accent hover:bg-slate-800/80"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <h3 className="truncate font-medium text-foreground group-hover:text-accent">{ex.name}</h3>
+                    {ex.muscle && (
+                      <span className="shrink-0 rounded-full border border-white/10 px-2 py-0.5 text-[11px] text-slate-400">
+                        {ex.muscle}
+                      </span>
+                    )}
+                  </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <dt className="text-xs text-slate-500">Best</dt>
+                      <dd className="font-semibold tabular-nums">{formatWeight(ex.bestWeight, units)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-slate-500">Est. 1RM</dt>
+                      <dd className="font-semibold tabular-nums">{formatWeight(ex.best1RM, units)}</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-2 text-xs text-slate-500">
+                    {ex.sessionCount} {ex.sessionCount === 1 ? "session" : "sessions"} · last {ex.lastDate}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </section>
   );

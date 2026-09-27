@@ -4,6 +4,13 @@ import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
+import { canonicalExerciseName } from "@/lib/exercises";
+import { useKnownExercises } from "@/lib/use-known-exercises";
+import {
+  RoutineExerciseEditor,
+  type EditableExercise,
+} from "@/components/routine-exercise-editor";
+import { errorMessage } from "@/lib/errors";
 
 // Types for the data received from the server component
 interface Routine {
@@ -18,11 +25,146 @@ interface Exercise {
   position: number;
   default_sets: number;
   default_reps: number;
+  muscle_group: string | null;
 }
 
-/**
- * Client‑side component handling edit/delete interactions.
- */
+// ---------------------------------------------------------------
+// Edit form
+// ---------------------------------------------------------------
+function EditRoutine({
+  routine,
+  exercises,
+  onDone,
+}: {
+  routine: Routine;
+  exercises: Exercise[];
+  onDone: () => void;
+}) {
+  const router = useRouter();
+  const knownNames = useKnownExercises();
+  const [name, setName] = useState(routine.name);
+  const [items, setItems] = useState<EditableExercise[]>(() =>
+    exercises.map((ex) => ({
+      key: ex.id,
+      id: ex.id,
+      name: ex.name,
+      muscle_group: ex.muscle_group,
+      default_sets: Number(ex.default_sets),
+      default_reps: Number(ex.default_reps),
+    }))
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (!name.trim()) return setError("Routine name cannot be empty.");
+    if (items.length === 0) return setError("Add at least one exercise.");
+    if (items.some((ex) => !ex.name.trim())) return setError("Exercise names cannot be empty.");
+
+    setLoading(true);
+    try {
+      const supabase = createBrowserClient();
+      const { error: routineErr } = await supabase
+        .from("routines")
+        .update({ name: name.trim() })
+        .eq("id", routine.id);
+      if (routineErr) throw routineErr;
+
+      const rows = items.map((ex, idx) => ({
+        routine_id: routine.id,
+        name: canonicalExerciseName(ex.name, knownNames),
+        muscle_group: ex.muscle_group,
+        position: idx + 1,
+        default_sets: ex.default_sets,
+        default_reps: ex.default_reps,
+      }));
+
+      // Update existing rows, insert new ones (kept separate so new rows never send id: null)
+      const existing = items
+        .map((ex, idx) => (ex.id ? { id: ex.id, ...rows[idx] } : null))
+        .filter((r): r is NonNullable<typeof r> => r !== null);
+      const added = rows.filter((_, idx) => !items[idx].id);
+
+      if (existing.length) {
+        const { error: upErr } = await supabase
+          .from("routine_exercises")
+          .upsert(existing, { onConflict: "id" });
+        if (upErr) throw upErr;
+      }
+      if (added.length) {
+        const { error: insErr } = await supabase.from("routine_exercises").insert(added);
+        if (insErr) throw insErr;
+      }
+
+      const keptIds = new Set(items.map((ex) => ex.id).filter(Boolean));
+      const toDelete = exercises.map((ex) => ex.id).filter((id) => !keptIds.has(id));
+      if (toDelete.length) {
+        const { error: delErr } = await supabase
+          .from("routine_exercises")
+          .delete()
+          .in("id", toDelete);
+        if (delErr) throw delErr;
+      }
+
+      router.refresh();
+      onDone();
+    } catch (err) {
+      setError(errorMessage(err, "An unexpected error occurred."));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="space-y-6 rounded-2xl border border-white/10 bg-slate-900/60 p-6"
+    >
+      {error && (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-400">
+          {error}
+        </p>
+      )}
+      <label className="block">
+        <span className="block text-sm font-medium text-slate-300">Routine Name</span>
+        <input
+          type="text"
+          required
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="mt-1 block w-full rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-sm text-foreground"
+        />
+      </label>
+      <div className="space-y-3">
+        <h2 className="text-lg font-medium text-foreground">Exercises</h2>
+        <RoutineExerciseEditor items={items} onChange={setItems} knownNames={knownNames} />
+      </div>
+      <div className="flex gap-3">
+        <button
+          type="submit"
+          disabled={loading}
+          className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-accent/90 disabled:opacity-60"
+        >
+          {loading ? "Saving…" : "Save Changes"}
+        </button>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={onDone}
+          className="rounded-lg border border-white/10 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/5"
+        >
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------
+// Detail view
+// ---------------------------------------------------------------
 export default function RoutineDetailClient({
   routine,
   exercises,
@@ -31,343 +173,147 @@ export default function RoutineDetailClient({
   exercises: Exercise[];
 }) {
   const router = useRouter();
-  const supabase = createBrowserClient();
-
   const [isEditing, setIsEditing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [busy, setBusy] = useState<"delete" | "duplicate" | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
-  // ---------------------------------------------------------------
-  // Delete handler
-  // ---------------------------------------------------------------
   const handleDelete = async () => {
-    if (!confirm("Delete this routine? This action cannot be undone."))
-      return;
-    setDeleting(true);
-    setDeleteError(null);
+    if (!confirm("Delete this routine? Your logged workouts are kept.")) return;
+    setBusy("delete");
+    setActionError(null);
     try {
-      // Delete associated exercises first (FK safety)
-      const { error: exErr } = await supabase
-        .from("routine_exercises")
-        .delete()
-        .eq("routine_id", routine.id);
-      if (exErr) throw exErr;
-
-      const { error: routineErr } = await supabase
+      // The database cascades this: routine_exercises are deleted and past
+      // workout_sessions keep their history with routine_id set to null.
+      // (see supabase/repair.sql)
+      const supabase = createBrowserClient();
+      const { data: deleted, error } = await supabase
         .from("routines")
         .delete()
-        .eq("id", routine.id);
-      if (routineErr) throw routineErr;
-
-      // Redirect to the list – the list page will fetch fresh data.
+        .eq("id", routine.id)
+        .select("id");
+      if (error) throw error;
+      if (!deleted?.length) {
+        throw new Error("Routine could not be deleted (no permission or already deleted).");
+      }
       router.push("/routines");
-    } catch (err: any) {
-      console.error(err);
-      setDeleteError(err.message ?? "Failed to delete routine.");
-    } finally {
-      setDeleting(false);
+      router.refresh();
+    } catch (err) {
+      const message = errorMessage(err, "Failed to delete routine.");
+      console.error("Delete routine failed:", message);
+      setActionError(message);
+      setBusy(null);
     }
   };
 
-  // ---------------------------------------------------------------
-  // EditRoutine sub‑component (client side)
-  // ---------------------------------------------------------------
-  function EditRoutine({
-    routine,
-    exercises,
-    onCancel,
-  }: {
-    routine: Routine;
-    exercises: Exercise[];
-    onCancel: () => void;
-  }) {
-    const [name, setName] = useState(routine.name);
-    const [exList, setExList] = useState(
-      exercises.map((ex) => ({
-        ...ex,
-        // Ensure numeric fields are numbers (Supabase may return strings)
-        default_sets: Number(ex.default_sets),
-        default_reps: Number(ex.default_reps),
-      }))
-    );
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const handleExerciseChange = (
-      index: number,
-      field: keyof typeof exList[0],
-      value: any
-    ) => {
-      setExList((prev) => {
-        const copy = [...prev];
-        // @ts-ignore – dynamic field assignment
-        copy[index][field] = value;
-        return copy;
-      });
-    };
-
-    const addExercise = () => {
-      setExList((prev) => [
-        ...prev,
-        {
-          // temporary client‑side id – prefixed with "new-"
-          id: `new-${Date.now()}`,
-          name: "",
-          position: prev.length + 1,
-          default_sets: 3,
-          default_reps: 10,
-        },
-      ]);
-    };
-
-    const removeExercise = (index: number) => {
-      setExList((prev) => prev.filter((_, i) => i !== index));
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      setError(null);
-
-      if (!name.trim()) {
-        setError("Routine name cannot be empty.");
-        return;
+  const handleDuplicate = async () => {
+    setBusy("duplicate");
+    setActionError(null);
+    try {
+      const supabase = createBrowserClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+      const { data: copy, error } = await supabase
+        .from("routines")
+        .insert({ name: `${routine.name} (copy)`, user_id: user.id })
+        .select("id")
+        .single();
+      if (error) throw error;
+      if (exercises.length) {
+        const { error: exErr } = await supabase.from("routine_exercises").insert(
+          exercises.map((ex) => ({
+            routine_id: copy.id,
+            name: ex.name,
+            muscle_group: ex.muscle_group,
+            position: ex.position,
+            default_sets: ex.default_sets,
+            default_reps: ex.default_reps,
+          }))
+        );
+        if (exErr) throw exErr;
       }
-      if (exList.length === 0) {
-        setError("Add at least one exercise.");
-        return;
-      }
-      if (exList.some((ex) => !ex.name.trim())) {
-        setError("Exercise names cannot be empty.");
-        return;
-      }
+      router.push(`/routines/${copy.id}`);
+      router.refresh();
+    } catch (err) {
+      setActionError(errorMessage(err, "Failed to duplicate routine."));
+      setBusy(null);
+    }
+  };
 
-      setLoading(true);
-      try {
-        // Update routine name
-        const { error: routineErr } = await supabase
-          .from("routines")
-          .update({ name: name.trim() })
-          .eq("id", routine.id);
-        if (routineErr) throw routineErr;
-
-        // Determine deletions vs upserts
-        const existingIds = exercises.map((ex) => ex.id);
-        const currentIds = exList
-          .filter(
-            (ex) => typeof ex.id === "string" && !ex.id.startsWith("new-")
-          )
-          .map((ex) => ex.id as string);
-        const toDelete = existingIds.filter((id) => !currentIds.includes(id));
-
-        // Build payload for upsert (new rows get undefined id)
-        const upsertPayload = exList.map((ex, idx) => ({
-          id: ex.id?.toString().startsWith("new-") ? undefined : ex.id,
-          routine_id: routine.id,
-          name: ex.name.trim(),
-          position: idx + 1,
-          default_sets: ex.default_sets,
-          default_reps: ex.default_reps,
-        }));
-
-        const { error: upsertErr } = await supabase
-          .from("routine_exercises")
-          .upsert(upsertPayload, { onConflict: "id" });
-        if (upsertErr) throw upsertErr;
-
-        // Delete any removed rows
-        if (toDelete.length) {
-          const { error: delErr } = await supabase
-            .from("routine_exercises")
-            .delete()
-            .in("id", toDelete);
-          if (delErr) throw delErr;
-        }
-
-        // Refresh server data so UI reflects the latest state.
-        // router.refresh() re‑runs the server component that fetched the routine.
-        router.refresh();
-        // Exit edit mode after refresh.
-        onCancel();
-      } catch (err: any) {
-        console.error(err);
-        setError(err.message ?? "An unexpected error occurred.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    return (
-      <form
-        onSubmit={handleSubmit}
-        className="mt-6 space-y-6 rounded-lg border border-white/10 bg-zinc-900/60 p-8"
-      >
-        {error && (
-          <p className="rounded border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-400">
-            {error}
-          </p>
-        )}
-        <label className="block">
-          <span className="block text-sm font-medium text-zinc-300">
-            Routine Name
-          </span>
-          <input
-            type="text"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 block w-full rounded-lg border border-white/10 bg-zinc-950 px-3 py-2 text-sm text-foreground placeholder:text-zinc-600 focus:border-accent"
-          />
-        </label>
-        <div className="space-y-4">
-          <h2 className="text-lg font-medium text-foreground">Exercises</h2>
-          {exList.map((ex, idx) => (
-            <div
-              key={ex.id}
-              className="grid grid-cols-1 gap-2 rounded-lg border border-white/10 bg-zinc-800/30 p-4 md:grid-cols-4"
-            >
-              <input
-                type="text"
-                required
-                value={ex.name}
-                onChange={(e) =>
-                  handleExerciseChange(idx, "name", e.target.value)
-                }
-                placeholder="Exercise name"
-                className="rounded-lg border border-white/10 bg-zinc-950 px-2 py-1 text-sm text-foreground placeholder:text-zinc-600 focus:border-accent"
-              />
-              <input
-                type="number"
-                min={1}
-                required
-                value={ex.default_sets}
-                onChange={(e) =>
-                  handleExerciseChange(
-                    idx,
-                    "default_sets",
-                    Number(e.target.value)
-                  )
-                }
-                className="rounded-lg border border-white/10 bg-zinc-950 px-2 py-1 text-sm text-foreground placeholder:text-zinc-600 focus:border-accent"
-                placeholder="Sets"
-              />
-              <input
-                type="number"
-                min={1}
-                required
-                value={ex.default_reps}
-                onChange={(e) =>
-                  handleExerciseChange(
-                    idx,
-                    "default_reps",
-                    Number(e.target.value)
-                  )
-                }
-                className="rounded-lg border border-white/10 bg-zinc-950 px-2 py-1 text-sm text-foreground placeholder:text-zinc-600 focus:border-accent"
-                placeholder="Reps"
-              />
-              <button
-                type="button"
-                onClick={() => removeExercise(idx)}
-                className="rounded-lg bg-red-600 px-2 py-1 text-xs font-medium text-white hover:bg-red-500"
-              >
-                Remove
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addExercise}
-            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-black hover:bg-accent/90"
-          >
-            + Add Exercise
-          </button>
-        </div>
-        <div className="flex gap-4">
-          <button
-            type="submit"
-            disabled={loading}
-            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-black hover:bg-accent/90 disabled:opacity-60"
-          >
-            {loading ? "Saving…" : "Save Changes"}
-          </button>
-          <button
-            type="button"
-            disabled={loading}
-            onClick={onCancel}
-            className="rounded-lg border border-white/10 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/5"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
-    );
-  }
-
-  // ---------------------------------------------------------------
-  // Render static view or edit form based on isEditing
-  // ---------------------------------------------------------------
   return (
     <section className="space-y-6">
-      {/* Header navigation */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <Link
           href="/routines"
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-zinc-400 hover:bg-white/5 hover:text-foreground"
+          className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-foreground"
         >
           ← Back to Routines
         </Link>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setIsEditing((v) => !v)}
-            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-black hover:bg-accent/90"
-          >
-            {isEditing ? "Cancel Edit" : "Edit"}
-          </button>
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            className="rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-500 disabled:opacity-60"
-          >
-            {deleting ? "Deleting…" : "Delete Routine"}
-          </button>
-        </div>
+        {!isEditing && (
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={`/log/${routine.id}`}
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-accent/90"
+            >
+              Start Workout
+            </Link>
+            <button
+              onClick={() => setIsEditing(true)}
+              className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-foreground hover:bg-white/5"
+            >
+              Edit
+            </button>
+            <button
+              onClick={handleDuplicate}
+              disabled={busy !== null}
+              className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium text-foreground hover:bg-white/5 disabled:opacity-60"
+            >
+              {busy === "duplicate" ? "Duplicating…" : "Duplicate"}
+            </button>
+            <button
+              onClick={handleDelete}
+              disabled={busy !== null}
+              className="rounded-lg px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/10 disabled:opacity-60"
+            >
+              {busy === "delete" ? "Deleting…" : "Delete"}
+            </button>
+          </div>
+        )}
       </div>
 
-      {deleteError && (
-        <p className="rounded border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-400">
-          {deleteError}
+      {actionError && (
+        <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-2 text-sm text-red-400">
+          {actionError}
         </p>
       )}
 
       {isEditing ? (
-        <EditRoutine
-          routine={routine}
-          exercises={exercises}
-          onCancel={() => setIsEditing(false)}
-        />
+        <EditRoutine routine={routine} exercises={exercises} onDone={() => setIsEditing(false)} />
       ) : (
         <>
-          <h1 className="text-2xl font-semibold text-foreground">
-            {routine.name}
-          </h1>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {exercises.map((ex) => (
-              <div
+          <h1 className="text-2xl font-semibold text-foreground">{routine.name}</h1>
+          <ol className="space-y-2">
+            {exercises.map((ex, idx) => (
+              <li
                 key={ex.id}
-                className="rounded-lg border border-white/10 bg-zinc-900/60 p-4"
+                className="flex items-center gap-4 rounded-xl border border-white/10 bg-slate-900/60 p-4"
               >
-                <h2 className="text-lg font-medium text-foreground">
-                  {ex.name}
-                </h2>
-                <p className="mt-1 text-sm text-zinc-400">
-                  {ex.default_sets} sets × {ex.default_reps} reps
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  Position: {ex.position}
-                </p>
-              </div>
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-400/15 text-sm font-semibold text-accent">
+                  {idx + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-foreground">{ex.name}</p>
+                  <p className="text-sm text-slate-400">
+                    {ex.default_sets} sets × {ex.default_reps} reps
+                  </p>
+                </div>
+                {ex.muscle_group && (
+                  <span className="shrink-0 rounded-full border border-white/10 px-2.5 py-0.5 text-xs text-slate-300">
+                    {ex.muscle_group}
+                  </span>
+                )}
+              </li>
             ))}
-          </div>
+          </ol>
         </>
       )}
     </section>

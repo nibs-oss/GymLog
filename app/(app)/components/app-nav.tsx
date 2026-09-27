@@ -43,7 +43,7 @@ export function AppNav() {
                 key={link.href}
                 href={link.href}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  active ? "text-accent" : "text-zinc-400 hover:bg-white/5 hover:text-foreground"
+                  active ? "text-accent" : "text-slate-400 hover:bg-white/5 hover:text-foreground"
                 }`}
               >
                 {link.label}
@@ -63,7 +63,7 @@ export function AppNav() {
                     key={link.href}
                     href={link.href}
                     className={`rounded px-3 py-2 text-sm ${
-                      active ? "text-accent" : "text-zinc-400 hover:bg-white/5 hover:text-foreground"
+                      active ? "text-accent" : "text-slate-400 hover:bg-white/5 hover:text-foreground"
                     }`}
                     onClick={() => setMenuOpen(false)}
                   >
