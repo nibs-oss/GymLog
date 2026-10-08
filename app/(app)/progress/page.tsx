@@ -82,7 +82,13 @@ export default async function ProgressPage() {
     <section className="space-y-6">
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold tracking-tight">Progress</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap justify-end gap-2">
+          <Link
+            href="/progress/report"
+            className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium hover:bg-white/5"
+          >
+            📊 Report
+          </Link>
           <Link
             href="/progress/records"
             className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium hover:bg-white/5"

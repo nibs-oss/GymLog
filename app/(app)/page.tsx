@@ -79,6 +79,8 @@ async function fetchDashboardData() {
 
   const streak = computeStreak(gymDates);
 
+  const lastMonth = addDaysIso(`${today.slice(0, 7)}-01`, -1).slice(0, 7); // YYYY-MM
+
   // This week's plan (Mon–Sun) with what was actually logged
   const routineName = new Map((routineRows ?? []).map((r) => [r.id as string, r.name as string]));
   const loggedDates = new Set(all.map((s) => s.date));
@@ -110,6 +112,9 @@ async function fetchDashboardData() {
     lastWorkout: all.find((s) => !s.isRest) ?? null,
     recent: all.slice(0, 5),
     bodyweight: latestWeight?.[0] ?? null,
+    // First week of a month: point to last month's report if there was training
+    reportMonth:
+      Number(today.slice(8, 10)) <= 7 && gymDates.some((d) => d.startsWith(lastMonth)) ? lastMonth : null,
     // Only once there's history from before this week to look back on
     lastWeek: all.some((s) => s.date < weekStart)
       ? weekRecap(rows, gymDates, lastWeekStart, settings.weekly_goal)
@@ -283,7 +288,7 @@ export default async function HomePage() {
     );
   }
 
-  const { settings, plan, streak, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
+  const { settings, plan, reportMonth, streak, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
     data;
   const goal = settings.weekly_goal;
   const remaining = Math.max(0, goal - weekGymDays);
@@ -379,6 +384,24 @@ export default async function HomePage() {
           </div>
         </div>
       </div>
+
+      {reportMonth && (
+        <Link
+          href={`/progress/report?month=${reportMonth}`}
+          className="flex items-center gap-3 rounded-2xl border border-sky-400/25 bg-sky-400/5 p-4 transition-colors hover:border-accent"
+        >
+          <span className="text-2xl">📊</span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-medium text-foreground">
+              Your{" "}
+              {new Date(`${reportMonth}-15T12:00:00Z`).toLocaleDateString(undefined, { month: "long", timeZone: "UTC" })}{" "}
+              report is ready
+            </span>
+            <span className="block text-sm text-slate-400">Workouts, volume, PRs and more</span>
+          </span>
+          <span className="text-slate-500">›</span>
+        </Link>
+      )}
 
       {lastWeek && <WeekRecapCard recap={lastWeek} units={settings.units} />}
 
