@@ -2,12 +2,14 @@ import Link from "next/link";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { fetchLoggedSets, summariseByExercise } from "@/lib/history";
 import { getUserSettings } from "@/lib/settings";
-import { addDaysIso, estimate1RM, phIsoDate, weekStartIso } from "@/lib/fitness";
+import { addDaysIso, estimate1RM, phIsoDate, setVolume, weekStartIso } from "@/lib/fitness";
 import { exerciseKey, libraryMuscle } from "@/lib/exercises";
 import { formatWeight } from "@/lib/units";
 import MuscleVolume from "./MuscleVolume";
 import StrengthLevel from "./StrengthLevel";
 import { bestLifts } from "@/lib/strength";
+import { buildHeatmap } from "@/lib/heatmap";
+import { WorkoutHeatmap } from "@/components/workout-heatmap";
 
 async function fetchProgress() {
   const supabase = await createServerClient();
@@ -16,7 +18,7 @@ async function fetchProgress() {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [rows, settings, { data: latestWeight }] = await Promise.all([
+  const [rows, settings, { data: latestWeight }, { data: restRows }] = await Promise.all([
     fetchLoggedSets(supabase, user.id),
     getUserSettings(supabase, user.id),
     supabase
@@ -25,6 +27,7 @@ async function fetchProgress() {
       .eq("user_id", user.id)
       .order("date", { ascending: false })
       .limit(1),
+    supabase.from("workout_sessions").select("date").eq("user_id", user.id).eq("is_rest_day", true),
   ]);
 
   const summaries = summariseByExercise(rows);
@@ -51,7 +54,12 @@ async function fetchProgress() {
       muscle: r.muscle ?? libraryMuscle(r.exercise) ?? "Other",
     }));
 
+  const volumeByDate = new Map<string, number>();
+  for (const r of rows) volumeByDate.set(r.date, (volumeByDate.get(r.date) ?? 0) + setVolume(r.weight, r.reps));
+  const heatmap = buildHeatmap(volumeByDate, new Set((restRows ?? []).map((r) => r.date as string)), phIsoDate());
+
   return {
+    heatmap,
     exercises,
     units: settings.units,
     weeks,
@@ -68,7 +76,7 @@ async function fetchProgress() {
 export default async function ProgressPage() {
   const data = await fetchProgress();
   if (!data) return null;
-  const { exercises, units, weeks, muscleSets, today, strength } = data;
+  const { heatmap, exercises, units, weeks, muscleSets, today, strength } = data;
 
   return (
     <section className="space-y-6">
@@ -102,6 +110,8 @@ export default async function ProgressPage() {
         </div>
       ) : (
         <>
+          <WorkoutHeatmap weeks={heatmap.weeks} months={heatmap.months} units={units} />
+
           <MuscleVolume weeks={weeks} sets={muscleSets} today={today} />
 
           <StrengthLevel
