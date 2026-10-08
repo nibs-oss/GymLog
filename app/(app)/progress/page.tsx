@@ -6,6 +6,8 @@ import { addDaysIso, estimate1RM, phIsoDate, weekStartIso } from "@/lib/fitness"
 import { exerciseKey, libraryMuscle } from "@/lib/exercises";
 import { formatWeight } from "@/lib/units";
 import MuscleVolume from "./MuscleVolume";
+import StrengthLevel from "./StrengthLevel";
+import { bestLifts } from "@/lib/strength";
 
 async function fetchProgress() {
   const supabase = await createServerClient();
@@ -14,9 +16,15 @@ async function fetchProgress() {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [rows, settings] = await Promise.all([
+  const [rows, settings, { data: latestWeight }] = await Promise.all([
     fetchLoggedSets(supabase, user.id),
     getUserSettings(supabase, user.id),
+    supabase
+      .from("body_weights")
+      .select("weight")
+      .eq("user_id", user.id)
+      .order("date", { ascending: false })
+      .limit(1),
   ]);
 
   const summaries = summariseByExercise(rows);
@@ -43,13 +51,24 @@ async function fetchProgress() {
       muscle: r.muscle ?? libraryMuscle(r.exercise) ?? "Other",
     }));
 
-  return { exercises, units: settings.units, weeks, muscleSets, today: phIsoDate() };
+  return {
+    exercises,
+    units: settings.units,
+    weeks,
+    muscleSets,
+    today: phIsoDate(),
+    strength: {
+      best: Object.fromEntries(bestLifts(rows)),
+      bodyweight: latestWeight?.[0] ? Number(latestWeight[0].weight) : null,
+      sex: settings.sex,
+    },
+  };
 }
 
 export default async function ProgressPage() {
   const data = await fetchProgress();
   if (!data) return null;
-  const { exercises, units, weeks, muscleSets, today } = data;
+  const { exercises, units, weeks, muscleSets, today, strength } = data;
 
   return (
     <section className="space-y-6">
@@ -84,6 +103,13 @@ export default async function ProgressPage() {
       ) : (
         <>
           <MuscleVolume weeks={weeks} sets={muscleSets} today={today} />
+
+          <StrengthLevel
+            best={strength.best}
+            bodyweight={strength.bodyweight}
+            initialSex={strength.sex}
+            units={units}
+          />
 
           <div className="space-y-3">
             <h2 className="text-lg font-medium text-foreground">Exercises</h2>
