@@ -3,7 +3,7 @@ import { addDaysIso, weekStartIso } from "./fitness.ts";
 /**
  * iCalendar feed of the weekly plan for calendar apps (Apple Calendar,
  * Google Calendar "From URL", Outlook). Each training weekday becomes a
- * repeating all-day event with an alert at 8:00 PM the evening before.
+ * repeating all-day event with an alert at 8:05 PM the evening before.
  */
 export interface PlannedDay {
   weekday: number; // 0 = Sunday … 6 = Saturday
@@ -11,8 +11,8 @@ export interface PlannedDay {
 }
 
 const BYDAY = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"];
-/** All-day events start at midnight, so 4 hours before = 8:00 PM the day before */
-const REMINDER = "-PT4H";
+/** All-day events start at midnight, so 3h55m before = 8:05 PM the day before */
+const REMINDER = "-PT3H55M";
 
 /** Escape text per RFC 5545 */
 function text(value: string) {
