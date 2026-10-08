@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CategoryBars } from "@/components/charts";
+import { MuscleMap } from "@/components/muscle-map";
 import { addDaysIso as addDays } from "@/lib/fitness";
 
 /** Sets per muscle group, for a chosen week (weeks[0] = this week). */
@@ -48,7 +49,7 @@ export default function MuscleVolume({
     <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-medium text-foreground">Sets per muscle group</h2>
+          <h2 className="text-lg font-medium text-foreground">Muscles trained</h2>
           <p className="text-xs text-slate-500">Aim for roughly 10–20 hard sets per muscle each week.</p>
         </div>
         <div className="flex rounded-lg border border-white/10 bg-slate-950 p-1">
@@ -66,7 +67,10 @@ export default function MuscleVolume({
           ))}
         </div>
       </div>
-      <CategoryBars data={data} unit="sets" />
+      <div className="grid items-center gap-4 md:grid-cols-2">
+        <MuscleMap counts={Object.fromEntries(data.map((d) => [d.name, d.value]))} />
+        <CategoryBars data={data} unit="sets" />
+      </div>
     </div>
   );
 }
