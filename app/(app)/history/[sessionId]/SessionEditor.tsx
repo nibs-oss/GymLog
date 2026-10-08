@@ -16,6 +16,7 @@ import {
   type WorkoutExercise,
 } from "@/lib/workout";
 import { errorMessage } from "@/lib/errors";
+import { ShareWorkoutButton } from "@/components/share-workout-button";
 
 interface LoadedExercise {
   name: string;
@@ -136,7 +137,13 @@ export default function SessionEditor({
           </p>
         </div>
         {!editing && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-end gap-2">
+            {!session.is_rest_day && (
+              <ShareWorkoutButton
+                sessionId={session.id}
+                className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium hover:bg-white/5 disabled:opacity-60"
+              />
+            )}
             <button
               onClick={() => setEditing(true)}
               className="rounded-lg border border-white/10 px-4 py-2 text-sm font-medium hover:bg-white/5"

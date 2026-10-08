@@ -22,6 +22,7 @@ import {
 import { errorMessage } from "@/lib/errors";
 import { addPending, isNetworkError, loadPending } from "@/lib/pending";
 import { useWakeLock } from "@/lib/use-wake-lock";
+import { ShareWorkoutButton } from "@/components/share-workout-button";
 
 interface RoutineExercise {
   id: string;
@@ -243,6 +244,14 @@ function LogSession({
             <p className="mt-2 text-sm text-amber-300">
               No connection right now. It&apos;ll upload automatically when you&apos;re back online.
             </p>
+          )}
+          {summary.sessionId && (
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+              <ShareWorkoutButton
+                sessionId={summary.sessionId}
+                className="rounded-lg border border-sky-400/40 px-4 py-2 text-sm font-semibold text-accent hover:bg-sky-400/10 disabled:opacity-60"
+              />
+            </div>
           )}
           <div className="mt-5 grid grid-cols-3 gap-3">
             {[
