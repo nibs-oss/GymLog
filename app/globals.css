@@ -4,7 +4,57 @@
   --background: #07111f;
   --foreground: #e6f1fb;
   --accent: #38bdf8; /* sky-400 */
+  --glow: rgb(56 189 248 / 0.18);
+  /* SVG colours (charts, goal ring) */
+  --ring-track: rgb(255 255 255 / 0.08);
+  --chart-axis: rgb(148 163 184);
+  --chart-grid: rgb(255 255 255 / 0.06);
+  --chart-cursor: rgb(255 255 255 / 0.25);
+  --chart-cursor-fill: rgb(255 255 255 / 0.04);
+  --chart-label: rgb(203 213 225);
   color-scheme: dark;
+}
+
+/*
+ * Light theme (Profile -> Appearance). The UI is written with dark-theme
+ * Tailwind colours, so instead of touching every class this redefines the
+ * palette: the slate scale flips (cards slate-900 -> white, muted text
+ * slate-400 -> slate-600), "white" overlays become dark overlays, and the
+ * bright accents step down to shades that read on a light background.
+ */
+:root[data-theme="light"] {
+  --background: #eef3f8;
+  --foreground: #0f172a;
+  --accent: #0284c7; /* sky-600 */
+  --glow: rgb(14 165 233 / 0.14);
+  --ring-track: rgb(15 23 42 / 0.08);
+  --chart-axis: rgb(100 116 139);
+  --chart-grid: rgb(15 23 42 / 0.08);
+  --chart-cursor: rgb(15 23 42 / 0.25);
+  --chart-cursor-fill: rgb(15 23 42 / 0.04);
+  --chart-label: rgb(51 65 85);
+  color-scheme: light;
+
+  --color-white: #0f172a;
+  --color-slate-950: #f8fafc;
+  --color-slate-900: #ffffff;
+  --color-slate-800: #e2e8f0;
+  --color-slate-700: #cbd5e1;
+  --color-slate-600: #94a3b8;
+  --color-slate-500: #64748b;
+  --color-slate-400: #475569;
+  --color-slate-300: #334155;
+  --color-slate-200: #1e293b;
+  --color-slate-100: #0f172a;
+  --color-sky-300: #0ea5e9;
+  --color-sky-400: #0284c7;
+  --color-amber-200: #92400e;
+  --color-amber-300: #b45309;
+  --color-amber-400: #d97706;
+  --color-emerald-300: #047857;
+  --color-emerald-400: #059669;
+  --color-emerald-950: #ecfdf5;
+  --color-red-400: #dc2626;
 }
 
 @theme inline {
@@ -17,7 +67,7 @@
 
 body {
   background:
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgb(56 189 248 / 0.18), transparent 70%),
+    radial-gradient(ellipse 80% 50% at 50% -10%, var(--glow), transparent 70%),
     var(--background);
   background-attachment: fixed;
   color: var(--foreground);

@@ -96,13 +96,13 @@ function GoalRing({ value, goal }: { value: number; goal: number }) {
   return (
     <div className="relative h-24 w-24 shrink-0">
       <svg viewBox="0 0 80 80" className="h-full w-full -rotate-90">
-        <circle cx="40" cy="40" r={r} fill="none" stroke="rgb(255 255 255 / 0.08)" strokeWidth="8" />
+        <circle cx="40" cy="40" r={r} fill="none" stroke="var(--ring-track)" strokeWidth="8" />
         <circle
           cx="40"
           cy="40"
           r={r}
           fill="none"
-          stroke={met ? "#34d399" : "var(--accent)"}
+          stroke={met ? "var(--color-emerald-400)" : "var(--accent)"}
           strokeWidth="8"
           strokeLinecap="round"
           strokeDasharray={c}

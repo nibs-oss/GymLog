@@ -12,8 +12,9 @@ import {
   YAxis,
 } from "recharts";
 
-const AXIS = "rgb(148 163 184)"; // slate-400: recessive axis text
-const GRID = "rgb(255 255 255 / 0.06)";
+// Theme-aware colours from globals.css
+const AXIS = "var(--chart-axis)";
+const GRID = "var(--chart-grid)";
 
 function shortDate(iso: string) {
   return new Date(`${iso}T12:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -79,7 +80,7 @@ export function TrendChart({
             domain={["auto", "auto"]}
           />
           <Tooltip
-            cursor={{ stroke: "rgb(255 255 255 / 0.25)", strokeWidth: 1 }}
+            cursor={{ stroke: "var(--chart-cursor)", strokeWidth: 1 }}
             content={<ChartTooltip unit={unit} labelFormat={shortDate} />}
           />
           <Line
@@ -123,13 +124,13 @@ export function CategoryBars({
             axisLine={false}
             width={88}
           />
-          <Tooltip cursor={{ fill: "rgb(255 255 255 / 0.04)" }} content={<ChartTooltip unit={unit} />} />
+          <Tooltip cursor={{ fill: "var(--chart-cursor-fill)" }} content={<ChartTooltip unit={unit} />} />
           <Bar
             dataKey="value"
             fill="var(--accent)"
             radius={[0, 4, 4, 0]}
             isAnimationActive={false}
-            label={{ position: "right", fill: "rgb(203 213 225)", fontSize: 12 }}
+            label={{ position: "right", fill: "var(--chart-label)", fontSize: 12 }}
           />
         </BarChart>
       </ResponsiveContainer>

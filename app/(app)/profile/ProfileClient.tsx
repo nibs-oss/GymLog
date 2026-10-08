@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { LogoutButton } from "@/components/logout-button";
 import { ChangePassword } from "@/components/change-password";
+import { readThemePref, setThemePref, subscribeThemePref, type ThemePref } from "@/lib/theme";
 import { ACHIEVEMENTS, achievementInfo } from "@/lib/achievements";
 
 type Settings = { units: string; weekly_goal: number; rest_day_reminders: boolean };
@@ -19,6 +20,7 @@ function ProfileClient({
   achievements: { type: string; earned_at: string }[];
 }) {
   const router = useRouter();
+  const theme = useSyncExternalStore<ThemePref>(subscribeThemePref, readThemePref, () => "dark");
   const [units, setUnits] = useState(initialSettings.units);
   const [weeklyGoal, setWeeklyGoal] = useState(initialSettings.weekly_goal);
   const [reminders, setReminders] = useState(initialSettings.rest_day_reminders);
@@ -77,6 +79,36 @@ function ProfileClient({
       <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
         <h2 className="mb-2 text-lg font-medium text-foreground">Settings</h2>
         <div className="divide-y divide-white/5">
+          {/* Appearance (this device only, applies right away) */}
+          <div className="flex items-center justify-between gap-4 py-4">
+            <div>
+              <p className="text-sm font-medium text-slate-200">Appearance</p>
+              <p className="text-xs text-slate-500">Saved on this device</p>
+            </div>
+            <div className="flex rounded-lg border border-white/10 bg-slate-950 p-1">
+              {(
+                [
+                  ["dark", "Dark"],
+                  ["light", "Light"],
+                  ["system", "Auto"],
+                ] as const
+              ).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setThemePref(value)}
+                  aria-pressed={theme === value}
+                  title={value === "system" ? "Follow this device's light/dark setting" : undefined}
+                  className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+                    theme === value ? "bg-accent text-slate-950" : "text-slate-400 hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Units */}
           <div className="flex items-center justify-between gap-4 py-4">
             <div>
@@ -156,7 +188,7 @@ function ProfileClient({
               }`}
             >
               <span
-                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                className={`absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-[#fff] shadow transition-transform ${
                   reminders ? "translate-x-5" : ""
                 }`}
               />
