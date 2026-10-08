@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { LogoutButton } from "@/components/logout-button";
 import { ChangePassword } from "@/components/change-password";
+import { CharacterCard } from "@/components/character-card";
 import { readThemePref, setThemePref, subscribeThemePref, type ThemePref } from "@/lib/theme";
 import { ACHIEVEMENTS, achievementInfo } from "@/lib/achievements";
 
@@ -14,10 +15,12 @@ function ProfileClient({
   email,
   initialSettings,
   achievements,
+  character,
 }: {
   email: string;
   initialSettings: Settings;
   achievements: { type: string; earned_at: string }[];
+  character: React.ComponentProps<typeof CharacterCard>;
 }) {
   const router = useRouter();
   const theme = useSyncExternalStore<ThemePref>(subscribeThemePref, readThemePref, () => "dark");
@@ -74,6 +77,8 @@ function ProfileClient({
           <p className="truncate text-sm text-slate-400">{email}</p>
         </div>
       </div>
+
+      <CharacterCard {...character} />
 
       {/* Settings */}
       <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6">

@@ -25,6 +25,7 @@ import { unitFor } from "@/lib/settings";
 import { saveSettingsPatch } from "@/lib/save-settings";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { ShareWorkoutButton } from "@/components/share-workout-button";
+import { levelFor, workoutXp } from "@/lib/levels";
 
 interface RoutineExercise {
   id: string;
@@ -89,6 +90,7 @@ type Props = {
   units: Units;
   exerciseUnits: Record<string, Units>;
   weeklyGoal: number;
+  xpBefore: number;
   history: Record<string, ExerciseSummary>;
 };
 
@@ -107,6 +109,7 @@ function LogSession({
   units,
   exerciseUnits: initialExerciseUnits,
   weeklyGoal,
+  xpBefore,
   history,
 }: Props) {
   const router = useRouter();
@@ -246,6 +249,9 @@ function LogSession({
   };
 
   if (summary) {
+    const gained = workoutXp({ sets: summary.sets, volumeKg: summary.volume, prs: summary.prs.length });
+    const before = levelFor(xpBefore);
+    const after = levelFor(xpBefore + gained);
     return (
       <section className="mx-auto max-w-xl space-y-5">
         <div className="rounded-2xl border border-sky-400/25 bg-gradient-to-br from-sky-500/20 via-sky-400/5 to-transparent p-6 text-center">
@@ -256,6 +262,17 @@ function LogSession({
           {!summary.sessionId && (
             <p className="mt-2 text-sm text-amber-300">
               No connection right now. It&apos;ll upload automatically when you&apos;re back online.
+            </p>
+          )}
+          <p className="mt-4 text-sm font-semibold text-accent">+{gained} XP</p>
+          {after.level > before.level ? (
+            <p className="mt-1 text-lg font-semibold text-foreground">
+              Level up! You&apos;re now Level {after.level}
+              {after.title !== before.title ? ` · ${after.title}` : ""}
+            </p>
+          ) : (
+            <p className="mt-1 text-xs text-slate-400">
+              {(after.xpForNext - after.xpIntoLevel).toLocaleString()} XP to Level {after.level + 1}
             </p>
           )}
           {summary.sessionId && (

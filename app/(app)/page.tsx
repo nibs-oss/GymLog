@@ -15,6 +15,7 @@ import {
 import { fetchLoggedSets } from "@/lib/history";
 import { topMuscles, weekRecap, type WeekRecap } from "@/lib/recap";
 import { muscleRecovery, RECOVERY_GROUPS } from "@/lib/recovery";
+import { levelFor, totalXp } from "@/lib/levels";
 import { getUserSettings } from "@/lib/settings";
 import { formatWeight, type Units } from "@/lib/units";
 import { RestReminderNotifier } from "@/components/rest-reminder";
@@ -113,6 +114,7 @@ async function fetchDashboardData() {
     settings,
     plan,
     readiness: rows.length ? { fresh, recovering } : null,
+    level: levelFor(totalXp(rows).xp),
     streak,
     freezeUsedThisWeek: frozen.some((d) => d >= weekStart),
     inARow,
@@ -299,7 +301,7 @@ export default async function HomePage() {
     );
   }
 
-  const { settings, plan, readiness, reportMonth, streak, freezeUsedThisWeek, inARow, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
+  const { settings, plan, readiness, level, reportMonth, streak, freezeUsedThisWeek, inARow, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
     data;
   const goal = settings.weekly_goal;
   const remaining = Math.max(0, goal - weekGymDays);
@@ -333,7 +335,12 @@ export default async function HomePage() {
   return (
     <section className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold tracking-tight">Home</h1>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Home</h1>
+          <Link href="/profile" className="text-sm text-slate-400 hover:text-accent">
+            Level {level.level} · {level.title}
+          </Link>
+        </div>
         <Link
           href={loggedToday ? "/history" : "/log"}
           className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-slate-950 hover:bg-accent/90"

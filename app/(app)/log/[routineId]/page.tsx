@@ -3,6 +3,7 @@ import { createClient as createServerClient } from "@/utils/supabase/server";
 import { getUserSettings } from "@/lib/settings";
 import { fetchLoggedSets, summariseByExercise, type ExerciseSummary } from "@/lib/history";
 import LogSessionClient from "./LogSessionClient";
+import { totalXp } from "@/lib/levels";
 
 /** Routine, its exercises, the user's settings, and what they did last time */
 async function fetchRoutineData(routineId: string) {
@@ -33,7 +34,7 @@ async function fetchRoutineData(routineId: string) {
   // Plain object so it can cross to the client component
   const history: Record<string, ExerciseSummary> = Object.fromEntries(summariseByExercise(rows));
 
-  return { routine, exercises: exercises ?? [], settings, history };
+  return { routine, exercises: exercises ?? [], settings, history, xpBefore: totalXp(rows).xp };
 }
 
 export default async function LogRoutinePage({
@@ -68,6 +69,7 @@ export default async function LogRoutinePage({
       units={data.settings.units}
       exerciseUnits={data.settings.exercise_units}
       weeklyGoal={data.settings.weekly_goal}
+      xpBefore={data.xpBefore}
       history={data.history}
     />
   );

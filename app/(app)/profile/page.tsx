@@ -1,5 +1,7 @@
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import ProfileClient from "./ProfileClient";
+import { fetchLoggedSets } from "@/lib/history";
+import { characterStats, totalXp } from "@/lib/levels";
 
 /** Server‑side data loader */
 async function loadProfileData() {
@@ -37,8 +39,12 @@ async function loadProfileData() {
     .select("type, earned_at")
     .eq("user_id", user.id);
 
+  const rows = await fetchLoggedSets(supabase, user.id);
+  const { xp, workouts } = totalXp(rows);
+
   return {
     email: user.email ?? "",
+    character: { xp, workouts, stats: characterStats(rows) },
     settings: settings ?? { units: "kg", weekly_goal: 3, rest_day_reminders: false },
     achievements: achievements ?? [],
   };
@@ -56,5 +62,10 @@ export default async function ProfilePage() {
     );
   }
 
-  return <ProfileClient email={data.email} initialSettings={data.settings} achievements={data.achievements} />;
+  return <ProfileClient
+      email={data.email}
+      initialSettings={data.settings}
+      achievements={data.achievements}
+      character={data.character}
+    />;
 }
