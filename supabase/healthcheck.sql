@@ -82,9 +82,9 @@ begin
                                    || case when n = 2 then '' else 'run features.sql' end);
 
   select count(*) into n from information_schema.columns
-   where table_schema = 'public' and table_name = 'user_settings' and column_name in ('schedule', 'exercise_units');
-  results := array_append(results, case when n = 2 then 'PASS|Weekly plan + exercise units columns exist|'
-                                        else 'FAIL|Weekly plan + exercise units columns exist|run features.sql' end);
+   where table_schema = 'public' and table_name = 'user_settings' and column_name in ('schedule', 'exercise_units', 'lift_goals');
+  results := array_append(results, case when n = 3 then 'PASS|Settings columns (plan, units, goals) exist|'
+                                        else 'FAIL|Settings columns (plan, units, goals) exist|run features.sql' end);
 
   results := array_append(results, case when to_regprocedure('public.calendar_plan(uuid)') is not null
                                         then 'PASS|Calendar feed function exists|'

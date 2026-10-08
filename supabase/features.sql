@@ -3,7 +3,7 @@
 -- Adds: muscle groups, bodyweight log, decimal weights (for kg/lbs), optional weight/reps per set,
 --       achievement de-duplication, all-or-nothing workout saving (save_workout),
 --       weekly plan (user_settings.schedule), per-exercise units (user_settings.exercise_units),
---       calendar subscription (user_settings.calendar_token, calendar_plan()).
+--       calendar subscription (user_settings.calendar_token, calendar_plan()), lift goals (user_settings.lift_goals).
 
 begin;
 
@@ -34,6 +34,9 @@ alter table public.user_settings add column if not exists exercise_units jsonb n
 -- /api/calendar/<token>.ics without logging in, so calendar_plan() returns
 -- only that user's weekly plan (routine names per weekday) for a valid token.
 alter table public.user_settings add column if not exists calendar_token uuid;
+
+-- Lift goals (Progress > Goals): [{ id, exercise, targetKg, reps, createdAt }]
+alter table public.user_settings add column if not exists lift_goals jsonb not null default '[]'::jsonb;
 create unique index if not exists user_settings_calendar_token_key
   on public.user_settings (calendar_token) where calendar_token is not null;
 

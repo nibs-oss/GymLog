@@ -8,6 +8,8 @@ import { formatWeight } from "@/lib/units";
 import MuscleVolume from "./MuscleVolume";
 import { buildHeatmap } from "@/lib/heatmap";
 import { WorkoutHeatmap } from "@/components/workout-heatmap";
+import { goalProgress, startingPoint } from "@/lib/goals";
+import Goals from "./Goals";
 
 async function fetchProgress() {
   const supabase = await createServerClient();
@@ -50,8 +52,21 @@ async function fetchProgress() {
   for (const r of rows) volumeByDate.set(r.date, (volumeByDate.get(r.date) ?? 0) + setVolume(r.weight, r.reps));
   const heatmap = buildHeatmap(volumeByDate, new Set((restRows ?? []).map((r) => r.date as string)), phIsoDate());
 
+  // Each goal starts from the best qualifying set logged before the day it was set
+  const today = phIsoDate();
+  const goals = settings.lift_goals.map((g) =>
+    goalProgress(
+      { ...g, startKg: startingPoint(rows.filter((r) => r.date < g.createdAt), g.exercise, g.reps) },
+      rows,
+      today
+    )
+  );
+
   return {
     heatmap,
+    goals,
+    rawGoals: settings.lift_goals,
+    knownExercises: [...summaries.values()].map((s) => s.name),
     exercises,
     units: settings.units,
     exerciseUnits: settings.exercise_units,
@@ -64,7 +79,7 @@ async function fetchProgress() {
 export default async function ProgressPage() {
   const data = await fetchProgress();
   if (!data) return null;
-  const { heatmap, exercises, units, exerciseUnits, weeks, muscleSets, today } = data;
+  const { heatmap, goals, rawGoals, knownExercises, exercises, units, exerciseUnits, weeks, muscleSets, today } = data;
 
   return (
     <section className="space-y-6">
@@ -105,6 +120,14 @@ export default async function ProgressPage() {
       ) : (
         <>
           <WorkoutHeatmap weeks={heatmap.weeks} months={heatmap.months} units={units} />
+
+          <Goals
+            progress={goals}
+            goals={rawGoals}
+            knownExercises={knownExercises}
+            units={units}
+            exerciseUnits={exerciseUnits}
+          />
 
           <MuscleVolume weeks={weeks} sets={muscleSets} today={today} />
 

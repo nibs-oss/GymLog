@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { exerciseKey } from "./exercises";
 import { asUnits, type Units } from "./units";
+import type { LiftGoal } from "./goals";
 
 /** Weekly plan: weekday ("0" = Sunday … "6" = Saturday) -> routine id, or "rest" */
 export type WeeklySchedule = Record<string, string>;
@@ -14,6 +15,8 @@ export interface UserSettings {
   exercise_units: Record<string, Units>;
   /** Private token for the calendar subscription link (null until created) */
   calendar_token: string | null;
+  /** Lift goals (Progress > Goals); targets in kg */
+  lift_goals: LiftGoal[];
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -23,7 +26,25 @@ export const DEFAULT_SETTINGS: UserSettings = {
   schedule: {},
   exercise_units: {},
   calendar_token: null,
+  lift_goals: [],
 };
+
+function asGoals(value: unknown): LiftGoal[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter(
+      (g) =>
+        g && typeof g.id === "string" && typeof g.exercise === "string" && Number(g.targetKg) > 0 && typeof g.createdAt === "string"
+    )
+    .map((g) => ({
+      id: g.id,
+      exercise: g.exercise,
+      targetKg: Number(g.targetKg),
+      reps: Math.max(1, Math.round(Number(g.reps) || 1)),
+      startKg: null,
+      createdAt: g.createdAt,
+    }));
+}
 
 function asExerciseUnits(value: unknown): Record<string, Units> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -63,5 +84,6 @@ export async function getUserSettings(
     schedule: asSchedule(data.schedule),
     exercise_units: asExerciseUnits(data.exercise_units),
     calendar_token: typeof data.calendar_token === "string" ? data.calendar_token : null,
+    lift_goals: asGoals(data.lift_goals),
   };
 }
