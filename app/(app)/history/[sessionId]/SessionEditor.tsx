@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { WorkoutEditor } from "@/components/workout-editor";
-import { setVolume } from "@/lib/fitness";
+import { phIsoDate, setVolume } from "@/lib/fitness";
 import { formatWeight, toDisplay, type Units } from "@/lib/units";
 import {
   cleanWorkout,
@@ -65,6 +65,11 @@ export default function SessionEditor({
 
   const save = async () => {
     setError(null);
+    // The date picker's max isn't enforced when typing, so check here too
+    if (!date || date > phIsoDate()) {
+      setError("Pick a date that isn't in the future.");
+      return;
+    }
     const clean = cleanWorkout(workout, units, knownNames);
     if (!session.is_rest_day && !clean.length) {
       setError("A workout needs at least one filled-in set. Delete it instead if it's empty.");
@@ -159,6 +164,7 @@ export default function SessionEditor({
             <span className="text-sm font-medium text-slate-300">Date</span>
             <input
               type="date"
+              max={phIsoDate()}
               value={date}
               onChange={(e) => setDate(e.target.value)}
               className="rounded-lg border border-white/10 bg-slate-950 px-2 py-1.5 text-sm text-foreground"

@@ -70,6 +70,10 @@ begin
   if auth.uid() is null then
     raise exception 'Not authenticated';
   end if;
+  -- Days are Philippine calendar dates (see lib/fitness.ts)
+  if p_date > (now() at time zone 'Asia/Manila')::date then
+    raise exception 'A workout can''t be dated in the future.';
+  end if;
 
   if sid is null then
     insert into workout_sessions (user_id, routine_id, date, is_rest_day)
