@@ -2,6 +2,7 @@
 
 import { exerciseKey } from "@/lib/exercises";
 import type { ExerciseSummary } from "@/lib/history";
+import { INCREMENT, suggestNext } from "@/lib/progression";
 import { toDisplay, type Units } from "@/lib/units";
 import { emptySet, newKey, type WorkoutExercise } from "@/lib/workout";
 import { ExerciseDatalist, ExerciseNameInput } from "./exercise-input";
@@ -14,6 +15,7 @@ const cell =
  * - `history` adds a "last time" column and PR badges
  * - `onSetDone` adds a ✓ column (used to start the rest timer)
  * - `fixedNames` locks names for exercises that come from the routine
+ * - `targetReps` (by exerciseKey) enables progressive overload suggestions
  */
 export function WorkoutEditor({
   exercises,
@@ -23,6 +25,7 @@ export function WorkoutEditor({
   onSetDone,
   knownNames = [],
   fixedNames = false,
+  targetReps = {},
 }: {
   exercises: WorkoutExercise[];
   onChange: (next: WorkoutExercise[]) => void;
@@ -31,6 +34,7 @@ export function WorkoutEditor({
   onSetDone?: () => void;
   knownNames?: string[];
   fixedNames?: boolean;
+  targetReps?: Record<string, number>;
 }) {
   const setEx = (i: number, patch: Partial<WorkoutExercise>) =>
     onChange(exercises.map((ex, idx) => (idx === i ? { ...ex, ...patch } : ex)));
@@ -45,6 +49,27 @@ export function WorkoutEditor({
         const past = history[exerciseKey(ex.name)];
         const best = past?.bestWeight ?? null;
         const locked = fixedNames && ex.key.startsWith("r-");
+        const suggestion = past
+          ? suggestNext(
+              past.lastSets.map((s) => ({ weight: toDisplay(s.weight, units), reps: s.reps })),
+              targetReps[exerciseKey(ex.name)] ?? null,
+              INCREMENT[units],
+              units
+            )
+          : null;
+        const suggestionText = suggestion
+          ? suggestion.weight !== null
+            ? `${suggestion.weight} ${units} × ${suggestion.reps}`
+            : `${suggestion.reps} reps`
+          : "";
+        const applied =
+          suggestion !== null &&
+          ex.sets.every(
+            (s) =>
+              s.done ||
+              ((suggestion.weight === null || Number(s.weight) === suggestion.weight) &&
+                Number(s.reps) === suggestion.reps)
+          );
         return (
           <div key={ex.key} className="rounded-2xl border border-white/10 bg-slate-900/60 p-4">
             <div className="mb-3 flex items-start gap-3">
@@ -65,6 +90,37 @@ export function WorkoutEditor({
                   {best !== null ? `Best: ${toDisplay(best, units)} ${units}` : "No history yet"}
                   {past?.lastDate ? ` · Last: ${past.lastDate}` : ""}
                 </p>
+                {suggestion && (
+                  <div className="mt-2 flex items-center gap-2 rounded-lg border border-sky-400/25 bg-sky-400/5 px-2.5 py-1.5">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {suggestion.kind === "increase" ? "📈" : suggestion.kind === "more-reps" ? "➕" : "🎯"} Try{" "}
+                        {suggestionText}
+                      </p>
+                      <p className="text-xs text-slate-400">{suggestion.reason}</p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={applied}
+                      onClick={() =>
+                        setEx(i, {
+                          sets: ex.sets.map((s) =>
+                            s.done
+                              ? s
+                              : {
+                                  ...s,
+                                  weight: suggestion.weight !== null ? String(suggestion.weight) : s.weight,
+                                  reps: String(suggestion.reps),
+                                }
+                          ),
+                        })
+                      }
+                      className="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-accent hover:bg-sky-400/10 disabled:text-slate-500 disabled:hover:bg-transparent"
+                    >
+                      {applied ? "Applied" : "Apply"}
+                    </button>
+                  </div>
+                )}
               </div>
               <button
                 type="button"

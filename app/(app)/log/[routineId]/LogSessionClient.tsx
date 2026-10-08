@@ -104,6 +104,14 @@ function LogSession({
 }: Props) {
   const router = useRouter();
   const knownNames = useMemo(() => Object.values(history).map((h) => h.name), [history]);
+  // The routine's rep target per exercise drives the progressive overload suggestion
+  const targetReps = useMemo(
+    () =>
+      Object.fromEntries(
+        exercises.filter((ex) => ex.default_reps > 0).map((ex) => [exerciseKey(ex.name), ex.default_reps])
+      ),
+    [exercises]
+  );
 
   const initialWorkout = (): WorkoutExercise[] =>
     exercises.map((ex) => {
@@ -320,6 +328,7 @@ function LogSession({
         }}
         knownNames={knownNames}
         fixedNames
+        targetReps={targetReps}
       />
 
       {error && (
