@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { TrendChart } from "@/components/charts";
-import { localIsoDate } from "@/lib/fitness";
+import { addDaysIso, addMonthsIso, phIsoDate } from "@/lib/fitness";
 import { formatWeight, toDisplay, toKg, type Units } from "@/lib/units";
 import { errorMessage } from "@/lib/errors";
 
@@ -24,7 +24,7 @@ export default function BodyweightClient({
   setupNeeded: boolean;
 }) {
   const router = useRouter();
-  const [date, setDate] = useState(localIsoDate());
+  const [date, setDate] = useState(phIsoDate());
   const [weight, setWeight] = useState("");
   const [range, setRange] = useState<"3m" | "1y" | "all">("3m");
   const [busy, setBusy] = useState(false);
@@ -33,10 +33,7 @@ export default function BodyweightClient({
   const chartData = useMemo(() => {
     let from = "";
     if (range !== "all") {
-      const d = new Date();
-      if (range === "1y") d.setFullYear(d.getFullYear() - 1);
-      else d.setMonth(d.getMonth() - 3);
-      from = localIsoDate(d);
+      from = addMonthsIso(phIsoDate(), range === "1y" ? -12 : -3);
     }
     return entries
       .filter((e) => e.date >= from)
@@ -45,9 +42,7 @@ export default function BodyweightClient({
 
   const latest = entries[entries.length - 1];
   const monthAgo = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() - 30);
-    const iso = localIsoDate(d);
+    const iso = addDaysIso(phIsoDate(), -30);
     return [...entries].reverse().find((e) => e.date <= iso);
   })();
   const change30 = latest && monthAgo ? latest.weight - monthAgo.weight : null;
@@ -108,7 +103,7 @@ export default function BodyweightClient({
           <input
             type="date"
             value={date}
-            max={localIsoDate()}
+            max={phIsoDate()}
             onChange={(e) => setDate(e.target.value)}
             className="rounded-lg border border-white/10 bg-slate-950 px-2 py-1.5 text-foreground"
           />

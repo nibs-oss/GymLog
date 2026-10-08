@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { localIsoDate } from "@/lib/fitness";
+import { phIsoDate } from "@/lib/fitness";
 
 interface SessionInfo {
   id: string;
@@ -22,10 +22,9 @@ function getMonthDays(year: number, month: number): Date[] {
 }
 
 export default function HistoryPage() {
-  const today = new Date();
-  const todayIso = localIsoDate(today);
-  const [year, setYear] = useState(today.getFullYear());
-  const [month, setMonth] = useState(today.getMonth() + 1); // 1-12
+  const todayIso = phIsoDate();
+  const [year, setYear] = useState(Number(todayIso.slice(0, 4)));
+  const [month, setMonth] = useState(Number(todayIso.slice(5, 7))); // 1-12
 
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
   const [loading, setLoading] = useState(false);
@@ -61,7 +60,7 @@ export default function HistoryPage() {
   // Days of this month that have happened so far (all of them for past months)
   const monthKey = `${year}-${String(month).padStart(2, "0")}`;
   const daysElapsed =
-    monthKey < todayIso.slice(0, 7) ? days.length : monthKey > todayIso.slice(0, 7) ? 0 : today.getDate();
+    monthKey < todayIso.slice(0, 7) ? days.length : monthKey > todayIso.slice(0, 7) ? 0 : Number(todayIso.slice(8, 10));
   const consistency = daysElapsed ? Math.min(100, Math.round((gymDaysThisMonth / daysElapsed) * 100)) : 0;
 
   const prevMonth = () => {
@@ -103,7 +102,7 @@ export default function HistoryPage() {
           ‹
         </button>
         <span className={`min-w-44 text-center text-lg font-medium text-foreground ${loading ? "opacity-50" : ""}`}>
-          {new Date(Date.UTC(year, month - 1)).toLocaleString(undefined, { month: "long", year: "numeric" })}
+          {new Date(Date.UTC(year, month - 1)).toLocaleString(undefined, { month: "long", year: "numeric", timeZone: "UTC" })}
         </span>
         <button onClick={nextMonth} aria-label="Next month" className="rounded-lg px-3 py-2 text-sm bg-slate-800 hover:bg-slate-700">
           ›

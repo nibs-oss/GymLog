@@ -8,12 +8,13 @@ import { WorkoutEditor } from "@/components/workout-editor";
 import { RestTimer, primeRestAudio } from "@/components/rest-timer";
 import { achievementInfo, awardAchievements } from "@/lib/achievements";
 import { exerciseKey } from "@/lib/exercises";
-import { localIsoDate, setVolume } from "@/lib/fitness";
+import { phIsoDate, setVolume } from "@/lib/fitness";
 import type { ExerciseSummary } from "@/lib/history";
 import { formatWeight, toDisplay, type Units } from "@/lib/units";
 import {
   cleanWorkout,
   emptySet,
+  findLogOnDate,
   findPRs,
   insertSessionExercises,
   type WorkoutExercise,
@@ -90,13 +91,17 @@ export default function LogSessionClient({
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
+      const today = phIsoDate();
+      if (await findLogOnDate(supabase, user.id, today)) {
+        throw new Error("You already logged a workout or rest day today.");
+      }
 
       const { data: sessionData, error: sessErr } = await supabase
         .from("workout_sessions")
         .insert({
           user_id: user.id,
           routine_id: routine.id,
-          date: localIsoDate(),
+          date: today,
           is_rest_day: false,
         })
         .select("id")

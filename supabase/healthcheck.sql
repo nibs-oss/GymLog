@@ -183,12 +183,19 @@ begin
     begin
       insert into public.workout_sessions (user_id, routine_id, date, is_rest_day)
         values (uid, null, current_date - 398, true) returning id::text into s2;
+      begin
+        insert into public.workout_sessions (user_id, routine_id, date, is_rest_day)
+          values (uid, null, current_date - 398, false);
+        raise exception 'second log on the same date was allowed (run repair.sql step 5)';
+      exception when unique_violation then
+        null; -- expected: one log per day
+      end;
       delete from public.workout_sessions where id::text = s2;
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'rest day delete removed % rows', n; end if;
-      results := results || ('PASS|Log + delete rest day|');
+      results := results || ('PASS|Log + delete rest day (one log per day)|');
     exception when others then
-      results := results || ('FAIL|Log + delete rest day|' || sqlerrm);
+      results := results || ('FAIL|Log + delete rest day (one log per day)|' || sqlerrm);
     end;
 
     -- 9. Settings upsert (profile)

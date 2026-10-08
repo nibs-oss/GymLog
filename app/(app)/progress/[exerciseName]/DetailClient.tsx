@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { TrendChart } from "@/components/charts";
-import { estimate1RM, localIsoDate, setVolume } from "@/lib/fitness";
+import { addMonthsIso, estimate1RM, phIsoDate, setVolume } from "@/lib/fitness";
 import { formatWeight, toDisplay, type Units } from "@/lib/units";
 
 interface SetRecord {
@@ -37,10 +37,7 @@ export default function DetailClient({
 
   const filtered = useMemo(() => {
     if (range === "all") return records;
-    const cutoff = new Date();
-    if (range === "1y") cutoff.setFullYear(cutoff.getFullYear() - 1);
-    else cutoff.setMonth(cutoff.getMonth() - (range === "1m" ? 1 : 3));
-    const iso = localIsoDate(cutoff);
+    const iso = addMonthsIso(phIsoDate(), range === "1y" ? -12 : range === "1m" ? -1 : -3);
     return records.filter((r) => r.date >= iso);
   }, [records, range]);
 

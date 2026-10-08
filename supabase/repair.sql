@@ -80,7 +80,37 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------
--- 5. Row-level security: replace all policies with one clear set
+-- 5. One log (workout or rest day) per user per PH calendar date.
+--    The app writes `date` as the Asia/Manila YYYY-MM-DD; this makes the
+--    database enforce it too. If duplicate days already exist they are NOT
+--    touched: the index is skipped and the duplicates are listed as notices.
+--    Resolve them (delete or move one log per day), then re-run this file.
+-- ---------------------------------------------------------------
+do $$
+declare d record;
+begin
+  if to_regclass('public.workout_sessions_user_date_key') is not null then
+    return;
+  end if;
+  if exists (select 1 from public.workout_sessions
+             group by user_id, date having count(*) > 1) then
+    for d in
+      select user_id, date, count(*) as n, string_agg(id::text, ', ') as ids
+      from public.workout_sessions
+      group by user_id, date having count(*) > 1
+      order by date
+    loop
+      raise notice 'Duplicate day: user %, date %, % logs (ids: %)', d.user_id, d.date, d.n, d.ids;
+    end loop;
+    raise notice 'Skipped workout_sessions_user_date_key: fix the duplicate days above, then re-run.';
+  else
+    create unique index workout_sessions_user_date_key
+      on public.workout_sessions (user_id, date);
+  end if;
+end $$;
+
+-- ---------------------------------------------------------------
+-- 6. Row-level security: replace all policies with one clear set
 -- ---------------------------------------------------------------
 do $$
 declare p record;

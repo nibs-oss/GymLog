@@ -2,12 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CategoryBars } from "@/components/charts";
-
-function addDays(iso: string, days: number) {
-  const d = new Date(`${iso}T12:00:00`);
-  d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
-}
+import { addDaysIso as addDays } from "@/lib/fitness";
 
 /** Sets per muscle group, for a chosen week (weeks[0] = this week). */
 export default function MuscleVolume({

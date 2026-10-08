@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { fetchLoggedSets } from "@/lib/history";
 import { getUserSettings } from "@/lib/settings";
-import { estimate1RM, localIsoDate } from "@/lib/fitness";
+import { estimate1RM, phIsoDate } from "@/lib/fitness";
 import { toDisplay } from "@/lib/units";
 
 function csvCell(v: unknown): string {
@@ -54,7 +54,7 @@ export async function GET() {
   return new NextResponse("﻿" + lines.join("\r\n"), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="gymlog-${localIsoDate()}.csv"`,
+      "Content-Disposition": `attachment; filename="gymlog-${phIsoDate()}.csv"`,
       "Cache-Control": "no-store",
     },
   });

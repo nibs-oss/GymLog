@@ -11,32 +11,69 @@ export function setVolume(weight: number | null, reps: number | null): number {
   return weight * reps;
 }
 
-/** YYYY-MM-DD in the viewer's local time zone (not UTC). */
-export function localIsoDate(d: Date = new Date()): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+/**
+ * A "day" in this app is a calendar date in the Philippines (UTC+8), regardless of
+ * where the code runs (UTC server, browser in another zone). Log dates are stored as
+ * plain YYYY-MM-DD strings, separate from the created_at timestamp.
+ */
+export const APP_TIME_ZONE = "Asia/Manila";
+
+const logDateFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
+/** YYYY-MM-DD calendar date in Asia/Manila for the instant `d` (default: now). */
+export function phIsoDate(d: Date = new Date()): string {
+  return logDateFormat.format(d);
 }
 
-/** Monday of the week containing `d`, as YYYY-MM-DD */
-export function weekStartIso(d: Date = new Date()): string {
-  const copy = new Date(d);
-  const dow = copy.getDay();
-  copy.setDate(copy.getDate() + (dow === 0 ? -6 : 1 - dow));
-  return localIsoDate(copy);
+/** Shift a YYYY-MM-DD date by whole days (pure calendar math, time-zone independent). */
+export function addDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
+/** Shift a YYYY-MM-DD date by whole months (overflow rolls forward, like Date#setMonth). */
+export function addMonthsIso(iso: string, months: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1 + months, d)).toISOString().slice(0, 10);
+}
+
+/** Whole days from `from` to `to` (both YYYY-MM-DD). */
+export function daysBetweenIso(from: string, to: string): number {
+  const ms = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((ms(to) - ms(from)) / 86_400_000);
+}
+
+/** Monday of the week containing the YYYY-MM-DD date (default: today in PH). */
+export function weekStartIso(iso: string = phIsoDate()): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return addDaysIso(iso, dow === 0 ? -6 : 1 - dow);
+}
+
+/** One log (workout or rest day) per PH calendar date: is `now`'s date already taken? */
+export function isAlreadyLogged(logDates: Iterable<string>, now: Date = new Date()): boolean {
+  const today = phIsoDate(now);
+  for (const d of logDates) if (d === today) return true;
+  return false;
 }
 
 /** Consecutive gym days ending today or yesterday (a streak survives until a day is missed). */
-export function computeStreak(gymDates: Iterable<string>, today: Date = new Date()): number {
+export function computeStreak(gymDates: Iterable<string>, now: Date = new Date()): number {
   const days = new Set(gymDates);
-  const cursor = new Date(today);
-  cursor.setHours(12, 0, 0, 0);
-  if (!days.has(localIsoDate(cursor))) cursor.setDate(cursor.getDate() - 1);
+  let cursor = phIsoDate(now);
+  if (!days.has(cursor)) cursor = addDaysIso(cursor, -1);
   let streak = 0;
-  while (days.has(localIsoDate(cursor))) {
+  while (days.has(cursor)) {
     streak++;
-    cursor.setDate(cursor.getDate() - 1);
+    cursor = addDaysIso(cursor, -1);
   }
   return streak;
 }

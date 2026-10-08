@@ -45,6 +45,21 @@ export function cleanWorkout(exercises: WorkoutExercise[], units: Units, knownNa
 
 export type CleanExercise = ReturnType<typeof cleanWorkout>[number];
 
+/**
+ * The user's log (workout or rest day) on a PH calendar date, if any.
+ * Compares only the stored YYYY-MM-DD log date, never timestamps.
+ */
+export async function findLogOnDate(supabase: SupabaseClient, userId: string, logDate: string) {
+  const { data, error } = await supabase
+    .from("workout_sessions")
+    .select("id, is_rest_day")
+    .eq("user_id", userId)
+    .eq("date", logDate)
+    .limit(1);
+  if (error) throw error;
+  return (data?.[0] as { id: string; is_rest_day: boolean } | undefined) ?? null;
+}
+
 /** Insert exercises + sets for a session. */
 export async function insertSessionExercises(
   supabase: SupabaseClient,

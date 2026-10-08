@@ -2,7 +2,7 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-import { computeStreak, localIsoDate, weekStartIso } from "@/lib/fitness";
+import { computeStreak, daysBetweenIso, isAlreadyLogged, phIsoDate, weekStartIso } from "@/lib/fitness";
 import { getUserSettings } from "@/lib/settings";
 import { formatWeight } from "@/lib/units";
 import { RestReminderNotifier } from "@/components/rest-reminder";
@@ -11,13 +11,12 @@ import { RestReminderNotifier } from "@/components/rest-reminder";
 const REST_AFTER_DAYS = 3;
 
 function relativeDate(dateStr: string): string {
-  const today = new Date(`${localIsoDate()}T12:00:00`);
-  const target = new Date(`${dateStr}T12:00:00`);
-  const diff = Math.round((today.getTime() - target.getTime()) / 86_400_000);
+  const diff = daysBetweenIso(dateStr, phIsoDate());
+  const target = new Date(`${dateStr}T12:00:00Z`);
   if (diff === 0) return "Today";
   if (diff === 1) return "Yesterday";
   if (diff < 7) return `${diff} days ago`;
-  return target.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return target.toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 interface SessionRow {
@@ -60,7 +59,7 @@ async function fetchDashboardData() {
   }));
 
   const gymDates = all.filter((s) => !s.isRest).map((s) => s.date);
-  const today = localIsoDate();
+  const today = phIsoDate();
   const weekStart = weekStartIso();
 
   return {
@@ -68,7 +67,7 @@ async function fetchDashboardData() {
     streak: computeStreak(gymDates),
     weekGymDays: new Set(gymDates.filter((d) => d >= weekStart && d <= today)).size,
     totalWorkouts: gymDates.length,
-    loggedToday: all.some((s) => s.date === today),
+    loggedToday: isAlreadyLogged(all.map((s) => s.date)),
     lastWorkout: all.find((s) => !s.isRest) ?? null,
     recent: all.slice(0, 5),
     bodyweight: latestWeight?.[0] ?? null,

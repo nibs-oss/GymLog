@@ -4,8 +4,9 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
-import { localIsoDate } from "@/lib/fitness";
+import { phIsoDate } from "@/lib/fitness";
 import { errorMessage } from "@/lib/errors";
+import { findLogOnDate } from "@/lib/workout";
 
 export default function RestDayPage() {
   const router = useRouter();
@@ -19,15 +20,9 @@ export default function RestDayPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
-      const today = localIsoDate();
+      const today = phIsoDate();
 
-      const { data: existing } = await supabase
-        .from("workout_sessions")
-        .select("id")
-        .eq("user_id", user.id)
-        .eq("date", today)
-        .limit(1);
-      if (existing?.length) {
+      if (await findLogOnDate(supabase, user.id, today)) {
         setState("exists");
         return;
       }

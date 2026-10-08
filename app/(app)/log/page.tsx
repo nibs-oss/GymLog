@@ -1,6 +1,6 @@
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import Link from "next/link";
-import { localIsoDate } from "@/lib/fitness";
+import { phIsoDate } from "@/lib/fitness";
 
 interface RoutineRow {
   id: string;
@@ -21,7 +21,7 @@ async function fetchRoutines() {
       .from("workout_sessions")
       .select("id, is_rest_day")
       .eq("user_id", user.id)
-      .eq("date", localIsoDate())
+      .eq("date", phIsoDate()) // PH calendar date, not the server's (UTC) date
       .limit(1),
     supabase
       .from("routines")

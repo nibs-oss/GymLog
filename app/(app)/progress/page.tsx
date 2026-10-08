@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { fetchLoggedSets, summariseByExercise } from "@/lib/history";
 import { getUserSettings } from "@/lib/settings";
-import { estimate1RM, localIsoDate, weekStartIso } from "@/lib/fitness";
+import { addDaysIso, estimate1RM, phIsoDate, weekStartIso } from "@/lib/fitness";
 import { exerciseKey, libraryMuscle } from "@/lib/exercises";
 import { formatWeight } from "@/lib/units";
 import MuscleVolume from "./MuscleVolume";
@@ -33,11 +33,8 @@ async function fetchProgress() {
 
   // Hard sets per muscle group for the last 4 weeks (Mon-based), newest first
   const weeks: string[] = [];
-  const cursor = new Date();
-  for (let i = 0; i < 4; i++) {
-    weeks.push(weekStartIso(cursor));
-    cursor.setDate(cursor.getDate() - 7);
-  }
+  const thisWeek = weekStartIso();
+  for (let i = 0; i < 4; i++) weeks.push(addDaysIso(thisWeek, -7 * i));
   const oldest = weeks[weeks.length - 1];
   const muscleSets = rows
     .filter((r) => r.date >= oldest)
@@ -46,7 +43,7 @@ async function fetchProgress() {
       muscle: r.muscle ?? libraryMuscle(r.exercise) ?? "Other",
     }));
 
-  return { exercises, units: settings.units, weeks, muscleSets, today: localIsoDate() };
+  return { exercises, units: settings.units, weeks, muscleSets, today: phIsoDate() };
 }
 
 export default async function ProgressPage() {
