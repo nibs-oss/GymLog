@@ -21,6 +21,7 @@ import {
 } from "@/lib/workout";
 import { errorMessage } from "@/lib/errors";
 import { addPending, isNetworkError, loadPending } from "@/lib/pending";
+import { useWakeLock } from "@/lib/use-wake-lock";
 
 interface RoutineExercise {
   id: string;
@@ -137,6 +138,8 @@ function LogSession({
   const [restoredDraft, setRestoredDraft] = useState(draft !== null);
   // Only keep a draft once the user has actually changed something
   const dirty = useRef(draft !== null);
+  // Don't let the phone lock between sets while the workout is open
+  useWakeLock(!summary);
 
   useEffect(() => {
     if (!dirty.current || summary) return;
