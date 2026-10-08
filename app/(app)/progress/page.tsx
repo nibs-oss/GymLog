@@ -10,6 +10,7 @@ import { buildHeatmap } from "@/lib/heatmap";
 import { WorkoutHeatmap } from "@/components/workout-heatmap";
 import { goalProgress, startingPoint } from "@/lib/goals";
 import Goals from "./Goals";
+import { muscleRecovery } from "@/lib/recovery";
 
 async function fetchProgress() {
   const supabase = await createServerClient();
@@ -64,6 +65,7 @@ async function fetchProgress() {
 
   return {
     heatmap,
+    recovery: muscleRecovery(rows, new Date()),
     goals,
     rawGoals: settings.lift_goals,
     knownExercises: [...summaries.values()].map((s) => s.name),
@@ -79,7 +81,7 @@ async function fetchProgress() {
 export default async function ProgressPage() {
   const data = await fetchProgress();
   if (!data) return null;
-  const { heatmap, goals, rawGoals, knownExercises, exercises, units, exerciseUnits, weeks, muscleSets, today } = data;
+  const { heatmap, recovery, goals, rawGoals, knownExercises, exercises, units, exerciseUnits, weeks, muscleSets, today } = data;
 
   return (
     <section className="space-y-6">
@@ -129,7 +131,7 @@ export default async function ProgressPage() {
             exerciseUnits={exerciseUnits}
           />
 
-          <MuscleVolume weeks={weeks} sets={muscleSets} today={today} />
+          <MuscleVolume weeks={weeks} sets={muscleSets} today={today} recovery={recovery} />
 
 
           <div className="space-y-3">

@@ -14,6 +14,7 @@ import {
 } from "@/lib/fitness";
 import { fetchLoggedSets } from "@/lib/history";
 import { topMuscles, weekRecap, type WeekRecap } from "@/lib/recap";
+import { muscleRecovery, RECOVERY_GROUPS } from "@/lib/recovery";
 import { getUserSettings } from "@/lib/settings";
 import { formatWeight, type Units } from "@/lib/units";
 import { RestReminderNotifier } from "@/components/rest-reminder";
@@ -103,9 +104,15 @@ async function fetchDashboardData() {
       })
     : null;
 
+  // Which muscles are fresh vs still recovering right now
+  const recovery = muscleRecovery(rows, new Date());
+  const recovering = RECOVERY_GROUPS.filter((g) => recovery[g] && recovery[g].status !== "fresh");
+  const fresh = RECOVERY_GROUPS.filter((g) => !recovery[g] || recovery[g].status === "fresh");
+
   return {
     settings,
     plan,
+    readiness: rows.length ? { fresh, recovering } : null,
     streak,
     freezeUsedThisWeek: frozen.some((d) => d >= weekStart),
     inARow,
@@ -292,7 +299,7 @@ export default async function HomePage() {
     );
   }
 
-  const { settings, plan, reportMonth, streak, freezeUsedThisWeek, inARow, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
+  const { settings, plan, readiness, reportMonth, streak, freezeUsedThisWeek, inARow, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
     data;
   const goal = settings.weekly_goal;
   const remaining = Math.max(0, goal - weekGymDays);
@@ -336,6 +343,26 @@ export default async function HomePage() {
       </div>
 
       {plan && <PlanCard plan={plan} loggedToday={loggedToday} />}
+
+      {readiness && (
+        <Link
+          href="/progress"
+          className="block rounded-2xl border border-white/10 bg-slate-900/60 px-5 py-3 text-sm transition-colors hover:border-accent"
+        >
+          <span className="font-medium text-foreground">Recovery</span>
+          <span className="text-slate-400">
+            {" · "}
+            <span className="text-emerald-400">Fresh:</span>{" "}
+            {readiness.fresh.length ? readiness.fresh.join(", ") : "none yet"}
+            {readiness.recovering.length > 0 && (
+              <>
+                {" · "}
+                <span className="text-red-400">Recovering:</span> {readiness.recovering.join(", ")}
+              </>
+            )}
+          </span>
+        </Link>
+      )}
 
       {suggestRest && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/5 p-4">
