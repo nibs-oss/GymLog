@@ -2,9 +2,11 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-import { computeStreak, daysBetweenIso, isAlreadyLogged, phIsoDate, weekStartIso } from "@/lib/fitness";
+import { addDaysIso, computeStreak, daysBetweenIso, isAlreadyLogged, phIsoDate, weekStartIso } from "@/lib/fitness";
+import { fetchLoggedSets } from "@/lib/history";
+import { weekRecap, type WeekRecap } from "@/lib/recap";
 import { getUserSettings } from "@/lib/settings";
-import { formatWeight } from "@/lib/units";
+import { formatWeight, type Units } from "@/lib/units";
 import { RestReminderNotifier } from "@/components/rest-reminder";
 
 /** Days in a row that trigger the rest reminder */
@@ -34,7 +36,7 @@ async function fetchDashboardData() {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [{ data: sessions }, settings, { data: latestWeight }] = await Promise.all([
+  const [{ data: sessions }, settings, { data: latestWeight }, rows] = await Promise.all([
     supabase
       .from("workout_sessions")
       .select("id, routine_id, date, is_rest_day, created_at, session_exercises(count), routines(name)")
@@ -48,6 +50,7 @@ async function fetchDashboardData() {
       .eq("user_id", user.id)
       .order("date", { ascending: false })
       .limit(1),
+    fetchLoggedSets(supabase, user.id),
   ]);
 
   const all = ((sessions ?? []) as unknown as SessionRow[]).map((s) => ({
@@ -61,6 +64,7 @@ async function fetchDashboardData() {
   const gymDates = all.filter((s) => !s.isRest).map((s) => s.date);
   const today = phIsoDate();
   const weekStart = weekStartIso();
+  const lastWeekStart = addDaysIso(weekStart, -7);
 
   return {
     settings,
@@ -71,6 +75,10 @@ async function fetchDashboardData() {
     lastWorkout: all.find((s) => !s.isRest) ?? null,
     recent: all.slice(0, 5),
     bodyweight: latestWeight?.[0] ?? null,
+    // Only once there's history from before this week to look back on
+    lastWeek: all.some((s) => s.date < weekStart)
+      ? weekRecap(rows, gymDates, lastWeekStart, settings.weekly_goal)
+      : null,
   };
 }
 
@@ -105,6 +113,52 @@ function GoalRing({ value, goal }: { value: number; goal: number }) {
   );
 }
 
+function rangeLabel(from: string, to: string) {
+  const fmt = (iso: string) =>
+    new Date(`${iso}T12:00:00Z`).toLocaleDateString(undefined, { month: "short", day: "numeric", timeZone: "UTC" });
+  return `${fmt(from)} – ${fmt(to)}`;
+}
+
+/** Monday–Sunday recap of last week: workouts vs goal, volume, new PRs */
+function WeekRecapCard({ recap, units }: { recap: WeekRecap; units: Units }) {
+  const met = recap.workouts >= recap.goal;
+  const change =
+    recap.previousVolume > 0 ? Math.round(((recap.volume - recap.previousVolume) / recap.previousVolume) * 100) : null;
+  return (
+    <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="font-medium text-foreground">Last week</h2>
+        <span className="text-xs text-slate-500">{rangeLabel(recap.from, recap.to)}</span>
+      </div>
+      <dl className="mt-3 grid grid-cols-3 gap-3">
+        <div>
+          <dt className="text-xs text-slate-500">Workouts</dt>
+          <dd className={`text-xl font-semibold tabular-nums ${met ? "text-emerald-400" : ""}`}>
+            {recap.workouts}/{recap.goal}
+            {met ? " ✓" : ""}
+          </dd>
+        </div>
+        <div className="min-w-0">
+          <dt className="text-xs text-slate-500">Volume</dt>
+          <dd className="truncate text-xl font-semibold tabular-nums">{formatWeight(recap.volume, units)}</dd>
+          {change !== null && (
+            <dd className={`text-xs tabular-nums ${change >= 0 ? "text-emerald-400" : "text-slate-400"}`}>
+              {change >= 0 ? "▲" : "▼"} {Math.abs(change)}% vs week before
+            </dd>
+          )}
+        </div>
+        <div className="min-w-0">
+          <dt className="text-xs text-slate-500">New PRs</dt>
+          <dd className={`text-xl font-semibold tabular-nums ${recap.prs.length ? "text-amber-400" : ""}`}>
+            {recap.prs.length ? `🏆 ${recap.prs.length}` : "0"}
+          </dd>
+          {recap.prs.length > 0 && <dd className="truncate text-xs text-slate-400">{recap.prs.join(", ")}</dd>}
+        </div>
+      </dl>
+    </div>
+  );
+}
+
 export default async function HomePage() {
   const data = await fetchDashboardData();
 
@@ -118,7 +172,7 @@ export default async function HomePage() {
     );
   }
 
-  const { settings, streak, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight } = data;
+  const { settings, streak, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } = data;
   const goal = settings.weekly_goal;
   const remaining = Math.max(0, goal - weekGymDays);
   const suggestRest = settings.rest_day_reminders && streak >= REST_AFTER_DAYS && !loggedToday;
@@ -207,6 +261,8 @@ export default async function HomePage() {
           </div>
         </div>
       </div>
+
+      {lastWeek && <WeekRecapCard recap={lastWeek} units={settings.units} />}
 
       <div className="grid gap-4 sm:grid-cols-2">
         {lastWorkout && (
