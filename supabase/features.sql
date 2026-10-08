@@ -1,12 +1,26 @@
 -- GymLog feature migration
 -- Run AFTER repair.sql, in Supabase dashboard -> SQL Editor. Safe to re-run.
--- Adds: muscle groups, bodyweight log, decimal weights (for kg/lbs), achievement de-duplication,
---       all-or-nothing workout saving (save_workout).
+-- Adds: muscle groups, bodyweight log, decimal weights (for kg/lbs), optional weight/reps per set,
+--       achievement de-duplication, all-or-nothing workout saving (save_workout).
 
 begin;
 
 -- Weights are always stored in kg. Allow decimals so lbs converts cleanly.
 alter table public.sets alter column weight type numeric using weight::numeric;
+
+-- A set may have no weight (bodyweight moves like dips) or no reps, but not
+-- neither. Empty means "not recorded", which the app already shows and
+-- totals that way; storing 0 instead would show up as a real 0 kg set.
+alter table public.sets alter column weight drop not null;
+alter table public.sets alter column reps drop not null;
+do $$
+begin
+  if not exists (select 1 from pg_constraint
+                 where conrelid = 'public.sets'::regclass and conname = 'sets_weight_or_reps') then
+    alter table public.sets
+      add constraint sets_weight_or_reps check (weight is not null or reps is not null);
+  end if;
+end $$;
 
 -- Muscle group per exercise (routine template + logged copy)
 alter table public.routine_exercises add column if not exists muscle_group text;

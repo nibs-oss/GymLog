@@ -73,6 +73,12 @@ begin
    where table_schema = 'public' and table_name = 'sets' and column_name = 'weight';
   results := results || (case when t = 'numeric' then 'PASS' else 'FAIL' end || '|sets.weight allows decimals|type: ' || coalesce(t, 'missing'));
 
+  select count(*) into n from information_schema.columns
+   where table_schema = 'public' and table_name = 'sets' and column_name in ('weight', 'reps') and is_nullable = 'YES';
+  results := array_append(results, case when n = 2 then 'PASS' else 'FAIL' end
+                                   || '|sets.weight / reps optional (bodyweight sets)|'
+                                   || case when n = 2 then '' else 'run features.sql' end);
+
   results := results || (case when to_regclass('public.workout_sessions_user_date_key') is not null
                               then 'PASS|One log per day index exists|'
                               else 'FAIL|One log per day index exists|missing: run repair.sql (lists any duplicate days)' end);
@@ -92,7 +98,7 @@ begin
         values (r1::uuid, 'Bench Press', 'Chest', 1, 3, 8) returning id::text into re1;
       insert into public.routine_exercises (routine_id, name, muscle_group, position, default_sets, default_reps)
         values (r1::uuid, 'Overhead Press', 'Shoulders', 2, 3, 10) returning id::text into re2;
-      results := results || ('PASS|Create routine + exercises|');
+      results := array_append(results, 'PASS|Create routine + exercises|');
     exception when others then
       results := results || ('FAIL|Create routine + exercises|' || sqlerrm);
     end;
@@ -108,7 +114,7 @@ begin
       delete from public.routine_exercises where id::text = re2;
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'delete exercise removed % rows', n; end if;
-      results := results || ('PASS|Edit routine (rename/update/add/remove)|');
+      results := array_append(results, 'PASS|Edit routine (rename/update/add/remove)|');
     exception when others then
       results := results || ('FAIL|Edit routine (rename/update/add/remove)|' || sqlerrm);
     end;
@@ -121,7 +127,7 @@ begin
           from public.routine_exercises where routine_id::text = r1;
       select count(*) into n from public.routine_exercises where routine_id::text = r2;
       if n <> 2 then raise exception 'copy has % exercises, expected 2', n; end if;
-      results := results || ('PASS|Duplicate routine|');
+      results := array_append(results, 'PASS|Duplicate routine|');
     exception when others then
       results := results || ('FAIL|Duplicate routine|' || sqlerrm);
     end;
@@ -138,7 +144,7 @@ begin
         (se1::uuid, 1, 45.359, 8), (se1::uuid, 2, 47.5, 6), (se2::uuid, 1, null, 12);
       select weight into v from public.sets where session_exercise_id::text = se1 and set_number = 1;
       if v <> 45.359 then raise exception 'weight stored as %', v; end if;
-      results := results || ('PASS|Log workout (session, exercises, sets, decimal kg)|');
+      results := array_append(results, 'PASS|Log workout (session, exercises, sets, decimal kg)|');
     exception when others then
       results := results || ('FAIL|Log workout (session, exercises, sets, decimal kg)|' || sqlerrm);
     end;
@@ -155,7 +161,7 @@ begin
       insert into public.sets (session_exercise_id, set_number, weight, reps) values (se1::uuid, 1, 50, 5);
       select count(*) into n from public.sets where session_exercise_id::text = se1;
       if n <> 1 then raise exception 'expected 1 set after edit, found %', n; end if;
-      results := results || ('PASS|Edit logged workout (date + sets)|');
+      results := array_append(results, 'PASS|Edit logged workout (date + sets)|');
     exception when others then
       results := results || ('FAIL|Edit logged workout (date + sets)|' || sqlerrm);
     end;
@@ -169,7 +175,7 @@ begin
       if n <> 1 then raise exception 'workout was not kept with routine_id = null'; end if;
       select count(*) into n from public.routine_exercises where routine_id::text = r1;
       if n <> 0 then raise exception '% routine exercises left behind', n; end if;
-      results := results || ('PASS|Delete routine used by a workout (history kept)|');
+      results := array_append(results, 'PASS|Delete routine used by a workout (history kept)|');
     exception when others then
       results := results || ('FAIL|Delete routine used by a workout (history kept)|' || sqlerrm);
     end;
@@ -183,7 +189,7 @@ begin
       if n <> 0 then raise exception '% sets left behind', n; end if;
       select count(*) into n from public.session_exercises where session_id::text = s1;
       if n <> 0 then raise exception '% exercises left behind', n; end if;
-      results := results || ('PASS|Delete workout (exercises + sets removed)|');
+      results := array_append(results, 'PASS|Delete workout (exercises + sets removed)|');
     exception when others then
       results := results || ('FAIL|Delete workout (exercises + sets removed)|' || sqlerrm);
     end;
@@ -202,7 +208,7 @@ begin
       delete from public.workout_sessions where id::text = s2;
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'rest day delete removed % rows', n; end if;
-      results := results || ('PASS|Log + delete rest day (one log per day)|');
+      results := array_append(results, 'PASS|Log + delete rest day (one log per day)|');
     exception when others then
       results := results || ('FAIL|Log + delete rest day (one log per day)|' || sqlerrm);
     end;
@@ -228,7 +234,7 @@ begin
        where se.session_id::text = s2;
       if n <> 2 then raise exception 'failed edit left % sets, expected the original 2', n; end if;
       delete from public.workout_sessions where id::text = s2;
-      results := results || ('PASS|Save workout all-or-nothing (save_workout)|');
+      results := array_append(results, 'PASS|Save workout all-or-nothing (save_workout)|');
     exception when others then
       results := results || ('FAIL|Save workout all-or-nothing (save_workout)|' || sqlerrm);
     end;
@@ -241,7 +247,7 @@ begin
                                             rest_day_reminders = excluded.rest_day_reminders;
       select count(*) into n from public.user_settings where user_id = uid and units = 'lbs' and weekly_goal = 5;
       if n <> 1 then raise exception 'found % matching settings rows', n; end if;
-      results := results || ('PASS|Save profile settings (one row per user)|');
+      results := array_append(results, 'PASS|Save profile settings (one row per user)|');
     exception when others then
       results := results || ('FAIL|Save profile settings (one row per user)|' || sqlerrm);
     end;
@@ -254,7 +260,7 @@ begin
         on conflict (user_id, type) do nothing;
       select count(*) into n from public.achievements where user_id = uid and type = 'hc_test';
       if n <> 1 then raise exception 'found % rows', n; end if;
-      results := results || ('PASS|Award achievement (no duplicates)|');
+      results := array_append(results, 'PASS|Award achievement (no duplicates)|');
     exception when others then
       results := results || ('FAIL|Award achievement (no duplicates)|' || sqlerrm);
     end;
@@ -270,7 +276,7 @@ begin
       delete from public.body_weights where user_id = uid and date = base;
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'delete removed % rows', n; end if;
-      results := results || ('PASS|Bodyweight save / overwrite / delete|');
+      results := array_append(results, 'PASS|Bodyweight save / overwrite / delete|');
     exception when others then
       results := results || ('FAIL|Bodyweight save / overwrite / delete|' || sqlerrm);
     end;
@@ -278,7 +284,7 @@ begin
     -- 12. Security: cannot write rows for someone else
     begin
       insert into public.routines (name, user_id) values ('HC intruder', gen_random_uuid());
-      results := results || ('FAIL|Blocked: create routine for another user|insert was allowed!');
+      results := array_append(results, 'FAIL|Blocked: create routine for another user|insert was allowed!');
     exception when others then
       results := results || ('PASS|Blocked: create routine for another user|' || sqlstate);
     end;
