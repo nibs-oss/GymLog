@@ -29,15 +29,25 @@ function num(v: string): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-/** Exercises with at least one filled-in set, converted to kg. Empty sets are dropped. */
-export function cleanWorkout(exercises: WorkoutExercise[], units: Units, knownNames: string[] = []) {
+/**
+ * Exercises with at least one filled-in set, converted to kg. Empty sets are dropped.
+ * `units` is the unit the weights were typed in: one for all, or per exercise name.
+ */
+export function cleanWorkout(
+  exercises: WorkoutExercise[],
+  units: Units | ((name: string) => Units),
+  knownNames: string[] = []
+) {
   return exercises
     .filter((ex) => ex.name.trim())
     .map((ex) => ({
       name: canonicalExerciseName(ex.name, knownNames),
       muscle_group: ex.muscle_group,
       sets: ex.sets
-        .map((s) => ({ weight: toKg(num(s.weight), units), reps: num(s.reps) }))
+        .map((s) => ({
+          weight: toKg(num(s.weight), typeof units === "function" ? units(ex.name) : units),
+          reps: num(s.reps),
+        }))
         .filter((s) => s.weight !== null || s.reps !== null),
     }))
     .filter((ex) => ex.sets.length > 0);

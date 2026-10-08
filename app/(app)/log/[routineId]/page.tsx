@@ -66,6 +66,7 @@ export default async function LogRoutinePage({
       routine={data.routine}
       exercises={data.exercises}
       units={data.settings.units}
+      exerciseUnits={data.settings.exercise_units}
       weeklyGoal={data.settings.weekly_goal}
       history={data.history}
     />

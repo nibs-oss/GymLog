@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { fetchLoggedSets, summariseByExercise } from "@/lib/history";
-import { getUserSettings } from "@/lib/settings";
+import { getUserSettings, unitFor } from "@/lib/settings";
 import { addDaysIso, estimate1RM, phIsoDate, setVolume, weekStartIso } from "@/lib/fitness";
 import { exerciseKey, libraryMuscle } from "@/lib/exercises";
 import { formatWeight } from "@/lib/units";
@@ -54,6 +54,7 @@ async function fetchProgress() {
     heatmap,
     exercises,
     units: settings.units,
+    exerciseUnits: settings.exercise_units,
     weeks,
     muscleSets,
     today: phIsoDate(),
@@ -63,7 +64,7 @@ async function fetchProgress() {
 export default async function ProgressPage() {
   const data = await fetchProgress();
   if (!data) return null;
-  const { heatmap, exercises, units, weeks, muscleSets, today } = data;
+  const { heatmap, exercises, units, exerciseUnits, weeks, muscleSets, today } = data;
 
   return (
     <section className="space-y-6">
@@ -128,11 +129,11 @@ export default async function ProgressPage() {
                   <dl className="mt-3 grid grid-cols-2 gap-2 text-sm">
                     <div>
                       <dt className="text-xs text-slate-500">Best</dt>
-                      <dd className="font-semibold tabular-nums">{formatWeight(ex.bestWeight, units)}</dd>
+                      <dd className="font-semibold tabular-nums">{formatWeight(ex.bestWeight, unitFor(ex.name, units, exerciseUnits))}</dd>
                     </div>
                     <div>
                       <dt className="text-xs text-slate-500">Est. 1RM</dt>
-                      <dd className="font-semibold tabular-nums">{formatWeight(ex.best1RM, units)}</dd>
+                      <dd className="font-semibold tabular-nums">{formatWeight(ex.best1RM, unitFor(ex.name, units, exerciseUnits))}</dd>
                     </div>
                   </dl>
                   <p className="mt-2 text-xs text-slate-500">

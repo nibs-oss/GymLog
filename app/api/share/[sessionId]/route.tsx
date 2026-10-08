@@ -1,6 +1,6 @@
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { fetchLoggedSets } from "@/lib/history";
-import { getUserSettings } from "@/lib/settings";
+import { getUserSettings, unitFor } from "@/lib/settings";
 import { computeStreak, setVolume } from "@/lib/fitness";
 import { exerciseKey } from "@/lib/exercises";
 import { newWeightPRs } from "@/lib/records";
@@ -72,7 +72,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ session
       exercises: exercises.map((ex) => ({
         name: ex.name,
         sets: ex.sets.length,
-        best: bestSetText(ex.sets, units),
+        best: bestSetText(ex.sets, unitFor(ex.name, units, settings.exercise_units)),
         pr: prs.has(exerciseKey(ex.name)),
       })),
     },

@@ -3,7 +3,7 @@
 import { exerciseKey } from "@/lib/exercises";
 import type { ExerciseSummary } from "@/lib/history";
 import { INCREMENT, suggestNext } from "@/lib/progression";
-import { toDisplay, type Units } from "@/lib/units";
+import { toDisplay, toKg, type Units } from "@/lib/units";
 import { emptySet, newKey, type WorkoutExercise } from "@/lib/workout";
 import { ExerciseDatalist, ExerciseNameInput } from "./exercise-input";
 
@@ -16,6 +16,8 @@ const cell =
  * - `onSetDone` adds a ✓ column (used to start the rest timer)
  * - `fixedNames` locks names for exercises that come from the routine
  * - `targetReps` (by exerciseKey) enables progressive overload suggestions
+ * - `exerciseUnits` (by exerciseKey) overrides `units` per exercise; with
+ *   `onExerciseUnitChange` each card gets a kg/lbs switch
  */
 export function WorkoutEditor({
   exercises,
@@ -26,6 +28,8 @@ export function WorkoutEditor({
   knownNames = [],
   fixedNames = false,
   targetReps = {},
+  exerciseUnits = {},
+  onExerciseUnitChange,
 }: {
   exercises: WorkoutExercise[];
   onChange: (next: WorkoutExercise[]) => void;
@@ -35,6 +39,8 @@ export function WorkoutEditor({
   knownNames?: string[];
   fixedNames?: boolean;
   targetReps?: Record<string, number>;
+  exerciseUnits?: Record<string, Units>;
+  onExerciseUnitChange?: (name: string, unit: Units) => void;
 }) {
   const setEx = (i: number, patch: Partial<WorkoutExercise>) =>
     onChange(exercises.map((ex, idx) => (idx === i ? { ...ex, ...patch } : ex)));
@@ -47,19 +53,21 @@ export function WorkoutEditor({
       <ExerciseDatalist id="workout-exercises" known={knownNames} />
       {exercises.map((ex, i) => {
         const past = history[exerciseKey(ex.name)];
+        // This exercise's unit (e.g. dumbbells in lbs while everything else is kg)
+        const u = exerciseUnits[exerciseKey(ex.name)] ?? units;
         const best = past?.bestWeight ?? null;
         const locked = fixedNames && ex.key.startsWith("r-");
         const suggestion = past
           ? suggestNext(
-              past.lastSets.map((s) => ({ weight: toDisplay(s.weight, units), reps: s.reps })),
+              past.lastSets.map((s) => ({ weight: toDisplay(s.weight, u), reps: s.reps })),
               targetReps[exerciseKey(ex.name)] ?? null,
-              INCREMENT[units],
-              units
+              INCREMENT[u],
+              u
             )
           : null;
         const suggestionText = suggestion
           ? suggestion.weight !== null
-            ? `${suggestion.weight} ${units} × ${suggestion.reps}`
+            ? `${suggestion.weight} ${u} × ${suggestion.reps}`
             : `${suggestion.reps} reps`
           : "";
         const applied =
@@ -87,16 +95,13 @@ export function WorkoutEditor({
                 )}
                 <p className="mt-1 text-xs text-slate-500">
                   {ex.muscle_group && locked ? `${ex.muscle_group} · ` : ""}
-                  {best !== null ? `Best: ${toDisplay(best, units)} ${units}` : "No history yet"}
+                  {best !== null ? `Best: ${toDisplay(best, u)} ${u}` : "No history yet"}
                   {past?.lastDate ? ` · Last: ${past.lastDate}` : ""}
                 </p>
                 {suggestion && (
                   <div className="mt-2 flex items-center gap-2 rounded-lg border border-sky-400/25 bg-sky-400/5 px-2.5 py-1.5">
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground">
-                        Try 
-                        {suggestionText}
-                      </p>
+                      <p className="text-sm font-medium text-foreground">Try {suggestionText}</p>
                       <p className="text-xs text-slate-400">{suggestion.reason}</p>
                     </div>
                     <button
@@ -122,6 +127,37 @@ export function WorkoutEditor({
                   </div>
                 )}
               </div>
+              {onExerciseUnitChange && ex.name.trim() && (
+                <div
+                  className="flex shrink-0 rounded-md border border-white/10 bg-slate-950 p-0.5"
+                  title="Unit for this exercise only"
+                >
+                  {(["kg", "lbs"] as const).map((unit) => (
+                    <button
+                      key={unit}
+                      type="button"
+                      aria-pressed={u === unit}
+                      aria-label={`${ex.name} in ${unit}`}
+                      onClick={() => {
+                        if (unit === u) return;
+                        // Convert what's typed so the actual weight stays the same
+                        setEx(i, {
+                          sets: ex.sets.map((s) => {
+                            const kg = s.weight.trim() === "" ? null : toKg(Number(s.weight), u);
+                            return kg === null ? s : { ...s, weight: String(toDisplay(kg, unit)) };
+                          }),
+                        });
+                        onExerciseUnitChange(ex.name, unit);
+                      }}
+                      className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
+                        u === unit ? "bg-accent text-slate-950" : "text-slate-400 hover:text-foreground"
+                      }`}
+                    >
+                      {unit}
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => onChange(exercises.filter((_, idx) => idx !== i))}
@@ -140,7 +176,7 @@ export function WorkoutEditor({
             >
               <span>Set</span>
               <span className="text-center">Last</span>
-              <span className="text-center">{units}</span>
+              <span className="text-center">{u}</span>
               <span className="text-center">Reps</span>
               {onSetDone && <span className="text-center">✓</span>}
               <span />
@@ -151,10 +187,10 @@ export function WorkoutEditor({
                 const last = past?.lastSets[j];
                 const lastText =
                   last && (last.weight !== null || last.reps !== null)
-                    ? `${last.weight !== null ? toDisplay(last.weight, units) : "–"} × ${last.reps ?? "–"}`
+                    ? `${last.weight !== null ? toDisplay(last.weight, u) : "–"} × ${last.reps ?? "–"}`
                     : "—";
                 const typed = Number(s.weight);
-                const isPR = best !== null && s.weight !== "" && typed > (toDisplay(best, units) ?? Infinity);
+                const isPR = best !== null && s.weight !== "" && typed > (toDisplay(best, u) ?? Infinity);
                 return (
                   <div
                     key={s.key}
@@ -170,7 +206,7 @@ export function WorkoutEditor({
                       onClick={() =>
                         last &&
                         setSet(i, j, {
-                          weight: last.weight !== null ? String(toDisplay(last.weight, units)) : s.weight,
+                          weight: last.weight !== null ? String(toDisplay(last.weight, u)) : s.weight,
                           reps: last.reps !== null ? String(last.reps) : s.reps,
                         })
                       }

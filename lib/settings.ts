@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { exerciseKey } from "./exercises";
 import { asUnits, type Units } from "./units";
 
 /** Weekly plan: weekday ("0" = Sunday … "6" = Saturday) -> routine id, or "rest" */
@@ -9,6 +10,8 @@ export interface UserSettings {
   weekly_goal: number;
   rest_day_reminders: boolean;
   schedule: WeeklySchedule;
+  /** Per-exercise unit overrides, keyed by exerciseKey(name) (e.g. dumbbells in lbs) */
+  exercise_units: Record<string, Units>;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -16,7 +19,20 @@ export const DEFAULT_SETTINGS: UserSettings = {
   weekly_goal: 3,
   rest_day_reminders: false,
   schedule: {},
+  exercise_units: {},
 };
+
+function asExerciseUnits(value: unknown): Record<string, Units> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(
+    Object.entries(value).filter(([, v]) => v === "kg" || v === "lbs")
+  ) as Record<string, Units>;
+}
+
+/** The unit an exercise is shown and entered in: its own override, else the user's default. */
+export function unitFor(name: string, units: Units, exerciseUnits: Record<string, Units>): Units {
+  return exerciseUnits[exerciseKey(name)] ?? units;
+}
 
 function asSchedule(value: unknown): WeeklySchedule {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
@@ -42,5 +58,6 @@ export async function getUserSettings(
     weekly_goal: Number(data.weekly_goal) || DEFAULT_SETTINGS.weekly_goal,
     rest_day_reminders: !!data.rest_day_reminders,
     schedule: asSchedule(data.schedule),
+    exercise_units: asExerciseUnits(data.exercise_units),
   };
 }

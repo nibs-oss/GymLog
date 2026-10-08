@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { fetchLoggedSets } from "@/lib/history";
-import { getUserSettings } from "@/lib/settings";
+import { getUserSettings, unitFor } from "@/lib/settings";
 import DetailClient from "./DetailClient";
 
 export default async function ExerciseDetailPage({
@@ -30,7 +30,7 @@ export default async function ExerciseDetailPage({
       </Link>
       <DetailClient
         name={rows.length ? rows[rows.length - 1].exercise : name}
-        units={settings.units}
+        units={unitFor(name, settings.units, settings.exercise_units)}
         records={rows.map((r) => ({
           sessionId: r.sessionId,
           date: r.date,

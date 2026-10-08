@@ -54,6 +54,7 @@ async function fetchSession(sessionId: string) {
         })),
     })),
     units: settings.units,
+    exerciseUnits: settings.exercise_units,
     knownNames,
   };
 }

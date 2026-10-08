@@ -21,6 +21,8 @@ import {
 } from "@/lib/workout";
 import { errorMessage } from "@/lib/errors";
 import { addPending, isNetworkError, loadPending } from "@/lib/pending";
+import { unitFor } from "@/lib/settings";
+import { saveSettingsPatch } from "@/lib/save-settings";
 import { useWakeLock } from "@/lib/use-wake-lock";
 import { ShareWorkoutButton } from "@/components/share-workout-button";
 
@@ -85,6 +87,7 @@ type Props = {
   routine: { id: string; name: string };
   exercises: RoutineExercise[];
   units: Units;
+  exerciseUnits: Record<string, Units>;
   weeklyGoal: number;
   history: Record<string, ExerciseSummary>;
 };
@@ -102,6 +105,7 @@ function LogSession({
   routine,
   exercises,
   units,
+  exerciseUnits: initialExerciseUnits,
   weeklyGoal,
   history,
 }: Props) {
@@ -116,6 +120,16 @@ function LogSession({
     [exercises]
   );
 
+  // Per-exercise kg/lbs (e.g. dumbbells in lbs); saved to the account when switched
+  const [exerciseUnits, setExerciseUnits] = useState(initialExerciseUnits);
+  const unitOf = (name: string) => unitFor(name, units, exerciseUnits);
+  const changeExerciseUnit = async (name: string, unit: Units) => {
+    const next = { ...exerciseUnits, [exerciseKey(name)]: unit };
+    setExerciseUnits(next);
+    const err = await saveSettingsPatch(createBrowserClient(), { exercise_units: next });
+    if (err) setError(`Couldn't remember the unit for ${name}: ${err}`);
+  };
+
   const initialWorkout = (): WorkoutExercise[] =>
     exercises.map((ex) => {
       const past = history[exerciseKey(ex.name)];
@@ -125,7 +139,7 @@ function LogSession({
         muscle_group: ex.muscle_group ?? past?.muscle ?? null,
         sets: Array.from({ length: Math.max(1, ex.default_sets) }, (_, j) => {
           const last = past?.lastSets[j] ?? past?.lastSets[past.lastSets.length - 1];
-          const w = last?.weight != null ? String(toDisplay(last.weight, units)) : "";
+          const w = last?.weight != null ? String(toDisplay(last.weight, unitOf(ex.name))) : "";
           return emptySet(w, ex.default_reps ? String(ex.default_reps) : "");
         }),
       };
@@ -165,7 +179,7 @@ function LogSession({
 
   const finishWorkout = async () => {
     setError(null);
-    const clean = cleanWorkout(workout, units, knownNames);
+    const clean = cleanWorkout(workout, unitOf, knownNames);
     if (!clean.length) {
       setError("Fill in at least one set before finishing.");
       return;
@@ -274,8 +288,8 @@ function LogSession({
                 <li key={pr.name} className="flex items-center justify-between text-sm">
                   <span className="text-slate-200">{pr.name}</span>
                   <span className="tabular-nums text-slate-400">
-                    {formatWeight(pr.previous, units)} →{" "}
-                    <span className="font-semibold text-foreground">{formatWeight(pr.weight, units)}</span>
+                    {formatWeight(pr.previous, unitOf(pr.name))} →{" "}
+                    <span className="font-semibold text-foreground">{formatWeight(pr.weight, unitOf(pr.name))}</span>
                   </span>
                 </li>
               ))}
@@ -354,6 +368,8 @@ function LogSession({
         exercises={workout}
         onChange={updateWorkout}
         units={units}
+        exerciseUnits={exerciseUnits}
+        onExerciseUnitChange={changeExerciseUnit}
         history={history}
         onSetDone={() => {
           dirty.current = true;

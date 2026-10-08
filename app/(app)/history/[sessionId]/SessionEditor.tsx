@@ -17,6 +17,9 @@ import {
 } from "@/lib/workout";
 import { errorMessage } from "@/lib/errors";
 import { ShareWorkoutButton } from "@/components/share-workout-button";
+import { exerciseKey } from "@/lib/exercises";
+import { unitFor } from "@/lib/settings";
+import { saveSettingsPatch } from "@/lib/save-settings";
 
 interface LoadedExercise {
   name: string;
@@ -29,16 +32,27 @@ export default function SessionEditor({
   routineName,
   exercises,
   units,
+  exerciseUnits: initialExerciseUnits,
   knownNames,
 }: {
   session: { id: string; date: string; is_rest_day: boolean };
   routineName: string | null;
   exercises: LoadedExercise[];
   units: Units;
+  exerciseUnits: Record<string, Units>;
   knownNames: string[];
 }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
+  // Per-exercise kg/lbs; switching while editing is remembered for the account
+  const [exerciseUnits, setExerciseUnits] = useState(initialExerciseUnits);
+  const unitOf = (name: string) => unitFor(name, units, exerciseUnits);
+  const changeExerciseUnit = async (name: string, unit: Units) => {
+    const next = { ...exerciseUnits, [exerciseKey(name)]: unit };
+    setExerciseUnits(next);
+    const err = await saveSettingsPatch(createClient(), { exercise_units: next });
+    if (err) setError(`Couldn't remember the unit for ${name}: ${err}`);
+  };
   const [date, setDate] = useState(session.date);
   const [workout, setWorkout] = useState<WorkoutExercise[]>(() =>
     exercises.map((ex) => ({
@@ -48,7 +62,7 @@ export default function SessionEditor({
       sets: ex.sets.length
         ? ex.sets.map((s) =>
             emptySet(
-              s.weight !== null ? String(toDisplay(s.weight, units)) : "",
+              s.weight !== null ? String(toDisplay(s.weight, unitOf(ex.name))) : "",
               s.reps !== null ? String(s.reps) : ""
             )
           )
@@ -71,7 +85,7 @@ export default function SessionEditor({
       setError("Pick a date that isn't in the future.");
       return;
     }
-    const clean = cleanWorkout(workout, units, knownNames);
+    const clean = cleanWorkout(workout, unitOf, knownNames);
     if (!session.is_rest_day && !clean.length) {
       setError("A workout needs at least one filled-in set. Delete it instead if it's empty.");
       return;
@@ -178,7 +192,14 @@ export default function SessionEditor({
             />
           </label>
           {!session.is_rest_day && (
-            <WorkoutEditor exercises={workout} onChange={setWorkout} units={units} knownNames={knownNames} />
+            <WorkoutEditor
+              exercises={workout}
+              onChange={setWorkout}
+              units={units}
+              exerciseUnits={exerciseUnits}
+              onExerciseUnitChange={changeExerciseUnit}
+              knownNames={knownNames}
+            />
           )}
           <div className="flex gap-3">
             <button
@@ -238,7 +259,7 @@ export default function SessionEditor({
                   <li key={j} className="flex gap-3 tabular-nums">
                     <span className="w-12 text-slate-500">Set {j + 1}</span>
                     <span>
-                      {formatWeight(s.weight, units)} × {s.reps ?? "—"}
+                      {formatWeight(s.weight, unitOf(ex.name))} × {s.reps ?? "—"}
                     </span>
                   </li>
                 ))}

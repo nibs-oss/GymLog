@@ -2,7 +2,7 @@
 -- Run AFTER repair.sql, in Supabase dashboard -> SQL Editor. Safe to re-run.
 -- Adds: muscle groups, bodyweight log, decimal weights (for kg/lbs), optional weight/reps per set,
 --       achievement de-duplication, all-or-nothing workout saving (save_workout),
---       weekly plan (user_settings.schedule).
+--       weekly plan (user_settings.schedule), per-exercise units (user_settings.exercise_units).
 
 begin;
 
@@ -25,6 +25,9 @@ end $$;
 
 -- Weekly plan (Routines page): weekday "0" (Sun) … "6" (Sat) -> routine id or "rest"
 alter table public.user_settings add column if not exists schedule jsonb not null default '{}'::jsonb;
+
+-- Per-exercise kg/lbs override: exerciseKey(name) -> "kg" | "lbs" (weights are still stored in kg)
+alter table public.user_settings add column if not exists exercise_units jsonb not null default '{}'::jsonb;
 
 -- Muscle group per exercise (routine template + logged copy)
 alter table public.routine_exercises add column if not exists muscle_group text;

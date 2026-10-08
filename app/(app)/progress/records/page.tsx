@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { fetchLoggedSets } from "@/lib/history";
-import { getUserSettings } from "@/lib/settings";
+import { getUserSettings, unitFor } from "@/lib/settings";
 import { addDaysIso, phIsoDate } from "@/lib/fitness";
 import { personalRecords } from "@/lib/records";
 import { formatWeight, toDisplay, type Units } from "@/lib/units";
@@ -34,7 +34,6 @@ export default async function RecordsPage() {
     fetchLoggedSets(supabase, user.id),
     getUserSettings(supabase, user.id),
   ]);
-  const units = settings.units;
   const records = personalRecords(rows);
   const newSince = addDaysIso(phIsoDate(), -(NEW_DAYS - 1));
 
@@ -61,6 +60,8 @@ export default async function RecordsPage() {
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {records.map((r) => {
+            // Each exercise in its own unit (e.g. dumbbells in lbs)
+            const units = unitFor(r.name, settings.units, settings.exercise_units);
             const isNew = r.lastRecordDate >= newSince;
             const stats = [
               r.heaviest && {
