@@ -94,7 +94,7 @@ export function WorkoutEditor({
                   <div className="mt-2 flex items-center gap-2 rounded-lg border border-sky-400/25 bg-sky-400/5 px-2.5 py-1.5">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-foreground">
-                        {suggestion.kind === "increase" ? "📈" : suggestion.kind === "more-reps" ? "➕" : "🎯"} Try{" "}
+                        Try 
                         {suggestionText}
                       </p>
                       <p className="text-xs text-slate-400">{suggestion.reason}</p>

@@ -41,7 +41,7 @@ export function ShareWorkoutButton({ sessionId, className }: { sessionId: string
   return (
     <>
       <button type="button" onClick={share} disabled={busy} className={className}>
-        {busy ? "Preparing…" : "📤 Share"}
+        {busy ? "Preparing…" : "Share"}
       </button>
       {error && <span className="text-sm text-red-400">{error}</span>}
     </>

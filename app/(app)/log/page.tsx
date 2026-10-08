@@ -63,7 +63,7 @@ export default async function LogHomePage() {
       {todaySession ? (
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6 text-center">
           <p className="text-slate-300">
-            You already logged {todaySession.is_rest_day ? "a rest day" : "a workout"} today. 💪
+            You already logged {todaySession.is_rest_day ? "a rest day" : "a workout"} today.
           </p>
           <Link
             href={`/history/${todaySession.id}`}
@@ -105,7 +105,7 @@ export default async function LogHomePage() {
             href="/log/rest"
             className="inline-block rounded-lg border border-white/10 px-4 py-2.5 text-sm font-medium text-foreground hover:bg-white/5"
           >
-            😴 Log Rest Day
+            Log Rest Day
           </Link>
         </>
       )}

@@ -117,7 +117,7 @@ export function RestTimer({ startedAt }: { startedAt: number | null }) {
     navigator.vibrate?.([200, 100, 200]);
     beep();
     if (document.hidden && "Notification" in window && Notification.permission === "granted") {
-      new Notification("Rest over 💪", { body: "Time for your next set." });
+      new Notification("Rest over", { body: "Time for your next set." });
     }
     const t = setTimeout(() => setEndAt(null), 3000);
     return () => clearTimeout(t);

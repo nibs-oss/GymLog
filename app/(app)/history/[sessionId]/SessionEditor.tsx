@@ -202,7 +202,7 @@ export default function SessionEditor({
         </>
       ) : session.is_rest_day ? (
         <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-center text-slate-400">
-          😴 Recovery day — no exercises logged.
+          Rest day. No exercises logged.
         </div>
       ) : (
         <>

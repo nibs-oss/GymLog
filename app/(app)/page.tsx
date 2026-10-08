@@ -179,7 +179,6 @@ function PlanCard({ plan, loggedToday }: { plan: PlanDay[]; loggedToday: boolean
         <div className="min-w-0">
           <p className="text-sm text-slate-400">Today&apos;s plan</p>
           <p className="truncate text-lg font-semibold text-foreground">
-            {today.rest ? "😴 " : today.routineName ? "🏋️ " : ""}
             {title}
           </p>
         </div>
@@ -204,7 +203,7 @@ function PlanCard({ plan, loggedToday }: { plan: PlanDay[]; loggedToday: boolean
       <ol className="mt-4 grid grid-cols-7 gap-1.5 text-center">
         {plan.map((d, i) => {
           const missed = d.isPast && !d.done && !!d.routineName;
-          const mark = d.done ? "✓" : d.rest ? "😴" : d.routineName ? "•" : "";
+          const mark = d.done ? "✓" : d.rest ? "Rest" : d.routineName ? "•" : "";
           return (
             <li
               key={d.date}
@@ -266,7 +265,7 @@ function WeekRecapCard({ recap, units }: { recap: WeekRecap; units: Units }) {
         <div className="min-w-0">
           <dt className="text-xs text-slate-500">New PRs</dt>
           <dd className={`text-xl font-semibold tabular-nums ${recap.prs.length ? "text-amber-400" : ""}`}>
-            {recap.prs.length ? `🏆 ${recap.prs.length}` : "0"}
+            {recap.prs.length}
           </dd>
           {recap.prs.length > 0 && <dd className="truncate text-xs text-slate-400">{recap.prs.join(", ")}</dd>}
         </div>
@@ -298,8 +297,7 @@ export default async function HomePage() {
     return (
       <section className="space-y-6">
         <div className="rounded-2xl border border-sky-400/20 bg-gradient-to-br from-sky-500/20 via-sky-400/5 to-transparent p-8 text-center">
-          <p className="text-4xl">🏋️</p>
-          <h1 className="mt-3 text-2xl font-semibold text-foreground">Welcome to GymLog!</h1>
+          <h1 className="text-2xl font-semibold text-foreground">Welcome to GymLog!</h1>
           <p className="mt-2 text-slate-400">Create a routine, then log your first workout.</p>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
             <Link
@@ -336,7 +334,6 @@ export default async function HomePage() {
 
       {suggestRest && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/5 p-4">
-          <span className="text-2xl">😴</span>
           <div className="flex-1">
             <p className="font-medium text-foreground">You&apos;ve trained {streak} days in a row</p>
             <p className="text-sm text-slate-400">
@@ -359,7 +356,7 @@ export default async function HomePage() {
           <div>
             <p className="text-sm text-slate-400">This week</p>
             <p className="mt-1 font-medium text-foreground">
-              {remaining === 0 ? "Weekly goal hit! 🎉" : `${remaining} more ${remaining === 1 ? "day" : "days"} to hit your goal`}
+              {remaining === 0 ? "Weekly goal hit!" : `${remaining} more ${remaining === 1 ? "day" : "days"} to hit your goal`}
             </p>
             <Link href="/profile" className="mt-1 inline-block text-xs text-slate-500 hover:text-accent">
               Goal: {goal} days/week · change
@@ -372,7 +369,6 @@ export default async function HomePage() {
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
             <p className="text-sm text-slate-400">Streak</p>
             <p className="mt-1 text-3xl font-semibold tabular-nums text-accent">
-              {streak > 0 ? "🔥 " : ""}
               {streak}
             </p>
             <p className="text-xs text-slate-500">{streak === 1 ? "day" : "days"} in a row</p>
@@ -390,7 +386,6 @@ export default async function HomePage() {
           href={`/progress/report?month=${reportMonth}`}
           className="flex items-center gap-3 rounded-2xl border border-sky-400/25 bg-sky-400/5 p-4 transition-colors hover:border-accent"
         >
-          <span className="text-2xl">📊</span>
           <span className="min-w-0 flex-1">
             <span className="block font-medium text-foreground">
               Your{" "}
@@ -421,7 +416,7 @@ export default async function HomePage() {
                 href={`/log/${lastWorkout.routineId}`}
                 className="shrink-0 rounded-lg border border-sky-400/40 px-3 py-2 text-sm font-medium text-accent hover:bg-sky-400/10"
               >
-                ↻ Repeat
+                Repeat
               </Link>
             )}
           </div>
@@ -453,9 +448,6 @@ export default async function HomePage() {
             href={`/history/${s.id}`}
             className="flex items-center gap-4 rounded-xl border border-white/10 bg-slate-900/60 p-3 transition-colors hover:border-accent"
           >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-sky-400/10 text-lg">
-              {s.isRest ? "😴" : "🏋️"}
-            </span>
             <div className="min-w-0 flex-1">
               <p className="truncate font-medium text-foreground">
                 {s.isRest ? "Rest Day" : s.routineName ?? "Workout"}

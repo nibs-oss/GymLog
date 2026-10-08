@@ -50,7 +50,7 @@ export function PendingSync() {
       )}
       {waiting > 0 && (
         <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-sm text-amber-300">
-          📶 {waiting} {waiting === 1 ? "workout is" : "workouts are"} saved on this phone and will upload when
+          {waiting} {waiting === 1 ? "workout is" : "workouts are"} saved on this phone and will upload when
           you&apos;re back online. Don&apos;t clear this browser&apos;s data until then.
         </p>
       )}

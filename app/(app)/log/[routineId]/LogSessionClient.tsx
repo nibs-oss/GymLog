@@ -235,8 +235,7 @@ function LogSession({
     return (
       <section className="mx-auto max-w-xl space-y-5">
         <div className="rounded-2xl border border-sky-400/25 bg-gradient-to-br from-sky-500/20 via-sky-400/5 to-transparent p-6 text-center">
-          <p className="text-4xl">{summary.sessionId ? "🎉" : "📶"}</p>
-          <h1 className="mt-2 text-2xl font-semibold">
+          <h1 className="text-2xl font-semibold">
             {summary.sessionId ? "Workout saved!" : "Saved on this phone"}
           </h1>
           <p className="mt-1 text-sm text-slate-400">{routine.name}</p>
@@ -269,7 +268,7 @@ function LogSession({
 
         {summary.prs.length > 0 && (
           <div className="rounded-2xl border border-amber-400/30 bg-amber-400/5 p-5">
-            <h2 className="font-medium text-foreground">🏆 New personal bests</h2>
+            <h2 className="font-medium text-foreground">New personal bests</h2>
             <ul className="mt-3 space-y-2">
               {summary.prs.map((pr) => (
                 <li key={pr.name} className="flex items-center justify-between text-sm">

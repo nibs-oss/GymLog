@@ -16,7 +16,7 @@ export function RestReminderNotifier({ streak, muscles = [] }: { streak: number;
     } catch {
       return;
     }
-    new Notification("Time for a rest day? 😴", {
+    new Notification("Time for a rest day?", {
       body: `You've trained ${streak} days in a row${
         musclesText ? `, mostly ${musclesText}` : ""
       }. Recovery helps you grow stronger.`,

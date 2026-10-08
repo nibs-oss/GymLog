@@ -44,7 +44,7 @@ export default async function RecordsPage() {
         <Link href="/progress" className="text-sm text-slate-400 hover:text-foreground">
           ← Back to Progress
         </Link>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">🏆 Personal Records</h1>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">Personal Records</h1>
         <p className="mt-1 text-sm text-slate-400">Your best lift for every exercise, newest records first.</p>
       </div>
 

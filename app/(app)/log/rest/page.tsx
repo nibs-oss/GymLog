@@ -42,7 +42,6 @@ export default function RestDayPage() {
   return (
     <section className="flex min-h-[60vh] items-center justify-center">
       <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-slate-900/60 p-8 text-center">
-        <p className="text-4xl">😴</p>
         {state === "done" ? (
           <p className="mt-3 text-slate-300">Rest day logged. Recover well!</p>
         ) : state === "exists" ? (

@@ -90,7 +90,7 @@ export function WeeklyPlan({
               className="min-w-0 flex-1 rounded-lg border border-white/10 bg-slate-950 px-2 py-1.5 text-sm text-foreground disabled:opacity-60"
             >
               <option value="">Nothing planned</option>
-              <option value="rest">😴 Rest day</option>
+              <option value="rest">Rest day</option>
               {routines.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}

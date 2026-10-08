@@ -62,7 +62,7 @@ export default async function MonthlyReportPage({
     { label: "Sets", value: String(r.sets), change: null },
     { label: "Longest streak", value: `${r.longestStreak} ${r.longestStreak === 1 ? "day" : "days"}`, change: null },
     { label: "Rest days", value: String(r.restDays), change: null },
-    { label: "New PRs", value: r.prs.length ? `🏆 ${r.prs.length}` : "0", change: null },
+    { label: "New PRs", value: String(r.prs.length), change: null },
   ];
 
   return (
@@ -72,7 +72,7 @@ export default async function MonthlyReportPage({
           ← Back to Progress
         </Link>
         <div className="mt-1 flex items-center justify-between gap-3">
-          <h1 className="text-2xl font-semibold tracking-tight">📊 {monthLabel(month)}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">{monthLabel(month)}</h1>
           <div className="flex gap-1">
             <Link
               href={`/progress/report?month=${prev}`}
@@ -133,7 +133,7 @@ export default async function MonthlyReportPage({
               {r.prs.length ? (
                 <ul className="mt-2 space-y-1 text-sm text-slate-300">
                   {r.prs.map((name) => (
-                    <li key={name}>🏆 {name}</li>
+                    <li key={name}>{name}</li>
                   ))}
                 </ul>
               ) : (
