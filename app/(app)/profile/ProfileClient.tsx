@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
 import { LogoutButton } from "@/components/logout-button";
+import { ChangePassword } from "@/components/change-password";
 import { ACHIEVEMENTS, achievementInfo } from "@/lib/achievements";
 
 type Settings = { units: string; weekly_goal: number; rest_day_reminders: boolean };
@@ -213,6 +214,8 @@ function ProfileClient({
           })}
         </ul>
       </div>
+
+      <ChangePassword email={email} />
 
       {/* Data */}
       <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-6">
