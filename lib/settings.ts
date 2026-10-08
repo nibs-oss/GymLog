@@ -9,8 +9,6 @@ export interface UserSettings {
   weekly_goal: number;
   rest_day_reminders: boolean;
   schedule: WeeklySchedule;
-  /** Which strength standards to compare against (Progress > Strength level) */
-  sex: "male" | "female" | null;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -18,7 +16,6 @@ export const DEFAULT_SETTINGS: UserSettings = {
   weekly_goal: 3,
   rest_day_reminders: false,
   schedule: {},
-  sex: null,
 };
 
 function asSchedule(value: unknown): WeeklySchedule {
@@ -45,6 +42,5 @@ export async function getUserSettings(
     weekly_goal: Number(data.weekly_goal) || DEFAULT_SETTINGS.weekly_goal,
     rest_day_reminders: !!data.rest_day_reminders,
     schedule: asSchedule(data.schedule),
-    sex: data.sex === "male" || data.sex === "female" ? data.sex : null,
   };
 }

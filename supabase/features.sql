@@ -2,7 +2,7 @@
 -- Run AFTER repair.sql, in Supabase dashboard -> SQL Editor. Safe to re-run.
 -- Adds: muscle groups, bodyweight log, decimal weights (for kg/lbs), optional weight/reps per set,
 --       achievement de-duplication, all-or-nothing workout saving (save_workout),
---       weekly plan (user_settings.schedule), strength standards (user_settings.sex).
+--       weekly plan (user_settings.schedule).
 
 begin;
 
@@ -25,15 +25,6 @@ end $$;
 
 -- Weekly plan (Routines page): weekday "0" (Sun) … "6" (Sat) -> routine id or "rest"
 alter table public.user_settings add column if not exists schedule jsonb not null default '{}'::jsonb;
-
--- Which strength standards to use (Progress > Strength level); empty until chosen
-alter table public.user_settings add column if not exists sex text;
-do $$
-begin
-  if not exists (select 1 from pg_constraint where conname = 'user_settings_sex_check') then
-    alter table public.user_settings add constraint user_settings_sex_check check (sex in ('male', 'female'));
-  end if;
-end $$;
 
 -- Muscle group per exercise (routine template + logged copy)
 alter table public.routine_exercises add column if not exists muscle_group text;

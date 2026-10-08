@@ -6,8 +6,6 @@ import { addDaysIso, estimate1RM, phIsoDate, setVolume, weekStartIso } from "@/l
 import { exerciseKey, libraryMuscle } from "@/lib/exercises";
 import { formatWeight } from "@/lib/units";
 import MuscleVolume from "./MuscleVolume";
-import StrengthLevel from "./StrengthLevel";
-import { bestLifts } from "@/lib/strength";
 import { buildHeatmap } from "@/lib/heatmap";
 import { WorkoutHeatmap } from "@/components/workout-heatmap";
 
@@ -18,15 +16,9 @@ async function fetchProgress() {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [rows, settings, { data: latestWeight }, { data: restRows }] = await Promise.all([
+  const [rows, settings, { data: restRows }] = await Promise.all([
     fetchLoggedSets(supabase, user.id),
     getUserSettings(supabase, user.id),
-    supabase
-      .from("body_weights")
-      .select("weight")
-      .eq("user_id", user.id)
-      .order("date", { ascending: false })
-      .limit(1),
     supabase.from("workout_sessions").select("date").eq("user_id", user.id).eq("is_rest_day", true),
   ]);
 
@@ -65,18 +57,13 @@ async function fetchProgress() {
     weeks,
     muscleSets,
     today: phIsoDate(),
-    strength: {
-      best: Object.fromEntries(bestLifts(rows)),
-      bodyweight: latestWeight?.[0] ? Number(latestWeight[0].weight) : null,
-      sex: settings.sex,
-    },
   };
 }
 
 export default async function ProgressPage() {
   const data = await fetchProgress();
   if (!data) return null;
-  const { heatmap, exercises, units, weeks, muscleSets, today, strength } = data;
+  const { heatmap, exercises, units, weeks, muscleSets, today } = data;
 
   return (
     <section className="space-y-6">
@@ -120,12 +107,6 @@ export default async function ProgressPage() {
 
           <MuscleVolume weeks={weeks} sets={muscleSets} today={today} />
 
-          <StrengthLevel
-            best={strength.best}
-            bodyweight={strength.bodyweight}
-            initialSex={strength.sex}
-            units={units}
-          />
 
           <div className="space-y-3">
             <h2 className="text-lg font-medium text-foreground">Exercises</h2>
