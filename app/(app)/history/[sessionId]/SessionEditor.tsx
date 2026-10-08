@@ -11,8 +11,8 @@ import {
   cleanWorkout,
   clearSessionExercises,
   emptySet,
-  insertSessionExercises,
   newKey,
+  saveWorkout,
   type WorkoutExercise,
 } from "@/lib/workout";
 import { errorMessage } from "@/lib/errors";
@@ -73,16 +73,14 @@ export default function SessionEditor({
     setBusy("save");
     try {
       const supabase = createClient();
-      if (date !== session.date) {
+      if (!session.is_rest_day) {
+        await saveWorkout(supabase, { sessionId: session.id, routineId: null, date, exercises: clean });
+      } else if (date !== session.date) {
         const { error: dateErr } = await supabase
           .from("workout_sessions")
           .update({ date })
           .eq("id", session.id);
         if (dateErr) throw dateErr;
-      }
-      if (!session.is_rest_day) {
-        await clearSessionExercises(supabase, session.id);
-        await insertSessionExercises(supabase, session.id, clean);
       }
       setEditing(false);
       router.refresh();

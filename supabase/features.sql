@@ -1,6 +1,7 @@
 -- GymLog feature migration
 -- Run AFTER repair.sql, in Supabase dashboard -> SQL Editor. Safe to re-run.
--- Adds: muscle groups, bodyweight log, decimal weights (for kg/lbs), achievement de-duplication.
+-- Adds: muscle groups, bodyweight log, decimal weights (for kg/lbs), achievement de-duplication,
+--       all-or-nothing workout saving (save_workout).
 
 begin;
 
@@ -42,6 +43,68 @@ begin
       add constraint achievements_user_id_type_key unique (user_id, type);
   end if;
 end $$;
+
+-- Save a workout (session + exercises + sets) in one transaction, so a dropped
+-- connection can't leave a half-saved workout. p_session_id null = log a new
+-- workout; otherwise replace that workout's date, exercises and sets.
+-- p_exercises: [{ "name", "muscle_group", "sets": [{ "weight", "reps" }] }]
+-- Runs as the calling user, so row-level security still applies.
+create or replace function public.save_workout(
+  p_session_id uuid,
+  p_routine_id uuid,
+  p_date date,
+  p_exercises jsonb
+) returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  sid uuid := p_session_id;
+  ex jsonb;
+  st jsonb;
+  ex_id uuid;
+  ex_pos int := 0;
+  set_no int;
+begin
+  if auth.uid() is null then
+    raise exception 'Not authenticated';
+  end if;
+
+  if sid is null then
+    insert into workout_sessions (user_id, routine_id, date, is_rest_day)
+    values (auth.uid(), p_routine_id, p_date, false)
+    returning id into sid;
+  else
+    update workout_sessions set date = p_date where id = sid and user_id = auth.uid();
+    if not found then
+      raise exception 'Workout not found';
+    end if;
+    delete from sets where session_exercise_id in (select id from session_exercises where session_id = sid);
+    delete from session_exercises where session_id = sid;
+  end if;
+
+  for ex in select * from jsonb_array_elements(coalesce(p_exercises, '[]'::jsonb))
+  loop
+    ex_pos := ex_pos + 1;
+    insert into session_exercises (session_id, name, muscle_group, position)
+    values (sid, ex->>'name', nullif(ex->>'muscle_group', ''), ex_pos)
+    returning id into ex_id;
+
+    set_no := 0;
+    for st in select * from jsonb_array_elements(coalesce(ex->'sets', '[]'::jsonb))
+    loop
+      set_no := set_no + 1;
+      insert into sets (session_exercise_id, set_number, weight, reps)
+      values (ex_id, set_no, (st->>'weight')::numeric, (st->>'reps')::numeric);
+    end loop;
+  end loop;
+
+  return sid;
+end $$;
+
+revoke execute on function public.save_workout(uuid, uuid, date, jsonb) from public, anon;
+grant execute on function public.save_workout(uuid, uuid, date, jsonb) to authenticated;
 
 commit;
 

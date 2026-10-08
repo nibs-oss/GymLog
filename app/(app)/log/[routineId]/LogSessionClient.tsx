@@ -16,7 +16,7 @@ import {
   emptySet,
   findLogOnDate,
   findPRs,
-  insertSessionExercises,
+  saveWorkout,
   type WorkoutExercise,
 } from "@/lib/workout";
 import { errorMessage } from "@/lib/errors";
@@ -158,7 +158,6 @@ function LogSession({
       return;
     }
     setSaving(true);
-    let sessionId: string | null = null;
     const supabase = createBrowserClient();
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -168,29 +167,23 @@ function LogSession({
         throw new Error("You already logged a workout or rest day today.");
       }
 
-      const { data: sessionData, error: sessErr } = await supabase
-        .from("workout_sessions")
-        .insert({
-          user_id: user.id,
-          routine_id: routine.id,
-          date: today,
-          is_rest_day: false,
-        })
-        .select("id")
-        .single();
-      if (sessErr) throw sessErr;
-      sessionId = sessionData.id as string;
-
-      await insertSessionExercises(supabase, sessionId, clean);
+      const sessionId = await saveWorkout(supabase, {
+        sessionId: null,
+        routineId: routine.id,
+        date: today,
+        exercises: clean,
+      });
+      clearDraft(routine.id);
 
       const priorBest = Object.fromEntries(
         Object.entries(history).map(([k, h]) => [k, h.bestWeight])
       );
       const prs = findPRs(clean, priorBest);
+      // The workout is already saved; an achievements hiccup shouldn't report it as failed
       const earned = await awardAchievements(supabase, user.id, {
         prCount: prs.length,
         weeklyGoal,
-      });
+      }).catch(() => [] as string[]);
 
       setSummary({
         sessionId,
@@ -203,12 +196,9 @@ function LogSession({
         prs,
         achievements: earned,
       });
-      clearDraft(routine.id);
       window.scrollTo({ top: 0, behavior: "smooth" });
       router.refresh();
     } catch (err) {
-      // Don't leave a half-saved empty session behind
-      if (sessionId) await supabase.from("workout_sessions").delete().eq("id", sessionId);
       setError(errorMessage(err, "Failed to save workout."));
     } finally {
       setSaving(false);

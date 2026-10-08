@@ -207,6 +207,32 @@ begin
       results := results || ('FAIL|Log + delete rest day (one log per day)|' || sqlerrm);
     end;
 
+    -- 8b. All-or-nothing workout save (save_workout from features.sql)
+    begin
+      s2 := public.save_workout(null, null, base + 3,
+        '[{"name":"HC Squat","muscle_group":"Legs","sets":[{"weight":100.5,"reps":5},{"weight":null,"reps":8}]}]'::jsonb)::text;
+      select count(*) into n from public.sets st
+        join public.session_exercises se on se.id = st.session_exercise_id
+       where se.session_id::text = s2;
+      if n <> 2 then raise exception 'new workout has % sets, expected 2', n; end if;
+      -- An edit that fails halfway must leave the saved workout untouched
+      begin
+        perform public.save_workout(s2::uuid, null, base + 3,
+          '[{"name":"HC Squat","sets":[{"weight":"oops","reps":5}]}]'::jsonb);
+        raise exception 'invalid weight was accepted';
+      exception when invalid_text_representation then
+        null; -- expected
+      end;
+      select count(*) into n from public.sets st
+        join public.session_exercises se on se.id = st.session_exercise_id
+       where se.session_id::text = s2;
+      if n <> 2 then raise exception 'failed edit left % sets, expected the original 2', n; end if;
+      delete from public.workout_sessions where id::text = s2;
+      results := results || ('PASS|Save workout all-or-nothing (save_workout)|');
+    exception when others then
+      results := results || ('FAIL|Save workout all-or-nothing (save_workout)|' || sqlerrm);
+    end;
+
     -- 9. Settings upsert (profile)
     begin
       insert into public.user_settings (user_id, units, weekly_goal, rest_day_reminders)

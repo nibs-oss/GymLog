@@ -60,6 +60,55 @@ export async function findLogOnDate(supabase: SupabaseClient, userId: string, lo
   return (data?.[0] as { id: string; is_rest_day: boolean } | undefined) ?? null;
 }
 
+/**
+ * Save a workout's session, exercises and sets all-or-nothing via the
+ * save_workout database function (supabase/features.sql). `sessionId` null logs
+ * a new workout; otherwise that workout's date, exercises and sets are replaced.
+ * Falls back to step-by-step writes if the function isn't installed yet.
+ */
+export async function saveWorkout(
+  supabase: SupabaseClient,
+  opts: { sessionId: string | null; routineId: string | null; date: string; exercises: CleanExercise[] }
+): Promise<string> {
+  const { data, error } = await supabase.rpc("save_workout", {
+    p_session_id: opts.sessionId,
+    p_routine_id: opts.routineId,
+    p_date: opts.date,
+    p_exercises: opts.exercises,
+  });
+  if (!error) return data as string;
+  if (error.code !== "PGRST202") throw error; // PGRST202: function not installed
+
+  if (opts.sessionId) {
+    const { error: dateErr } = await supabase
+      .from("workout_sessions")
+      .update({ date: opts.date })
+      .eq("id", opts.sessionId);
+    if (dateErr) throw dateErr;
+    await clearSessionExercises(supabase, opts.sessionId);
+    await insertSessionExercises(supabase, opts.sessionId, opts.exercises);
+    return opts.sessionId;
+  }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const { data: session, error: sessErr } = await supabase
+    .from("workout_sessions")
+    .insert({ user_id: user.id, routine_id: opts.routineId, date: opts.date, is_rest_day: false })
+    .select("id")
+    .single();
+  if (sessErr) throw sessErr;
+  const sessionId = session.id as string;
+  try {
+    await insertSessionExercises(supabase, sessionId, opts.exercises);
+  } catch (err) {
+    // Don't leave a half-saved empty session behind
+    await supabase.from("workout_sessions").delete().eq("id", sessionId);
+    throw err;
+  }
+  return sessionId;
+}
+
 /** Insert exercises + sets for a session. */
 export async function insertSessionExercises(
   supabase: SupabaseClient,
