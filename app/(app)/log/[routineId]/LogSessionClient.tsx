@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient as createBrowserClient } from "@/utils/supabase/client";
@@ -30,6 +30,45 @@ interface RoutineExercise {
   muscle_group: string | null;
 }
 
+/** Unfinished workout kept on this device so a closed tab or reload doesn't lose it */
+interface Draft {
+  workout: WorkoutExercise[];
+  restStartedAt: number | null;
+  savedAt: number;
+}
+
+const DRAFT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const draftKey = (routineId: string) => `gymlog.workoutDraft.${routineId}`;
+
+function loadDraft(routineId: string): Draft | null {
+  try {
+    const raw = localStorage.getItem(draftKey(routineId));
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as Draft;
+    if (!Array.isArray(draft.workout) || Date.now() - draft.savedAt > DRAFT_MAX_AGE_MS) {
+      localStorage.removeItem(draftKey(routineId));
+      return null;
+    }
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
+function saveDraft(routineId: string, draft: Draft) {
+  try {
+    localStorage.setItem(draftKey(routineId), JSON.stringify(draft));
+  } catch {
+    // Storage full or blocked: the workout still works, it just isn't kept
+  }
+}
+
+function clearDraft(routineId: string) {
+  try {
+    localStorage.removeItem(draftKey(routineId));
+  } catch {}
+}
+
 interface Summary {
   sessionId: string;
   exercises: number;
@@ -39,23 +78,34 @@ interface Summary {
   achievements: string[];
 }
 
-export default function LogSessionClient({
-  routine,
-  exercises,
-  units,
-  weeklyGoal,
-  history,
-}: {
+type Props = {
   routine: { id: string; name: string };
   exercises: RoutineExercise[];
   units: Units;
   weeklyGoal: number;
   history: Record<string, ExerciseSummary>;
-}) {
+};
+
+const noopSubscribe = () => () => {};
+
+/** Renders only in the browser, so the saved draft can be read on first render. */
+export default function LogSessionClient(props: Props) {
+  const isClient = useSyncExternalStore(noopSubscribe, () => true, () => false);
+  if (!isClient) return <p className="text-center text-sm text-slate-400">Loading workout…</p>;
+  return <LogSession {...props} />;
+}
+
+function LogSession({
+  routine,
+  exercises,
+  units,
+  weeklyGoal,
+  history,
+}: Props) {
   const router = useRouter();
   const knownNames = useMemo(() => Object.values(history).map((h) => h.name), [history]);
 
-  const [workout, setWorkout] = useState<WorkoutExercise[]>(() =>
+  const initialWorkout = (): WorkoutExercise[] =>
     exercises.map((ex) => {
       const past = history[exerciseKey(ex.name)];
       return {
@@ -68,12 +118,34 @@ export default function LogSessionClient({
           return emptySet(w, ex.default_reps ? String(ex.default_reps) : "");
         }),
       };
-    })
-  );
-  const [restStartedAt, setRestStartedAt] = useState<number | null>(null);
+    });
+  const [draft] = useState(() => loadDraft(routine.id));
+  const [workout, setWorkout] = useState<WorkoutExercise[]>(() => draft?.workout ?? initialWorkout());
+  const [restStartedAt, setRestStartedAt] = useState<number | null>(draft?.restStartedAt ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [restoredDraft, setRestoredDraft] = useState(draft !== null);
+  // Only keep a draft once the user has actually changed something
+  const dirty = useRef(draft !== null);
+
+  useEffect(() => {
+    if (!dirty.current || summary) return;
+    saveDraft(routine.id, { workout, restStartedAt, savedAt: Date.now() });
+  }, [routine.id, workout, restStartedAt, summary]);
+
+  const updateWorkout = (next: WorkoutExercise[]) => {
+    dirty.current = true;
+    setWorkout(next);
+  };
+
+  const discardDraft = () => {
+    clearDraft(routine.id);
+    dirty.current = false;
+    setWorkout(initialWorkout());
+    setRestStartedAt(null);
+    setRestoredDraft(false);
+  };
 
   const doneSets = workout.reduce((n, ex) => n + ex.sets.filter((s) => s.done).length, 0);
   const totalSets = workout.reduce((n, ex) => n + ex.sets.length, 0);
@@ -131,6 +203,7 @@ export default function LogSessionClient({
         prs,
         achievements: earned,
       });
+      clearDraft(routine.id);
       window.scrollTo({ top: 0, behavior: "smooth" });
       router.refresh();
     } catch (err) {
@@ -236,12 +309,22 @@ export default function LogSessionClient({
         Tap a <span className="text-slate-300">Last</span> value to copy it. Tick ✓ after each set to start the rest timer.
       </p>
 
+      {restoredDraft && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-accent/30 bg-accent/10 px-3 py-2 text-sm text-accent">
+          <span>Restored your unfinished workout.</span>
+          <button type="button" onClick={discardDraft} className="shrink-0 text-xs text-slate-300 underline hover:text-foreground">
+            Start over
+          </button>
+        </div>
+      )}
+
       <WorkoutEditor
         exercises={workout}
-        onChange={setWorkout}
+        onChange={updateWorkout}
         units={units}
         history={history}
         onSetDone={() => {
+          dirty.current = true;
           primeRestAudio();
           setRestStartedAt(Date.now());
         }}
