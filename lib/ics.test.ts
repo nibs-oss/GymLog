@@ -22,8 +22,8 @@ test("one weekly all-day event per training day, Monday first", () => {
   assert.ok(lines.includes("RRULE:FREQ=WEEKLY;BYDAY=SU"));
 });
 
-test("8:20 PM reminder the evening before", () => {
-  assert.equal(lines.filter((l) => l === "TRIGGER:-PT3H40M").length, 2);
+test("8 PM reminder the evening before", () => {
+  assert.equal(lines.filter((l) => l === "TRIGGER:-PT4H").length, 2);
   assert.ok(lines.includes("DESCRIPTION:Tomorrow: Push Day"));
 });
 

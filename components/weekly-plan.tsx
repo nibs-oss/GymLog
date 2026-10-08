@@ -152,9 +152,13 @@ export function WeeklyPlan({
       <div className="mt-5 border-t border-white/5 pt-4">
         <p className="text-sm font-medium text-slate-200">Calendar reminders</p>
         <p className="mt-1 text-xs text-slate-500">
-          Adds your plan to your phone&apos;s calendar, with a reminder at 8:20 PM the night before each
-          training day. Changes here update the calendar automatically. On iPhone, tap Subscribe and turn
-          off &ldquo;Remove Alerts&rdquo;.
+          Adds your plan to your phone&apos;s calendar, with a reminder at 8:00 PM the night before each
+          training day. Changes here update the calendar automatically.
+        </p>
+        <p className="mt-2 text-xs text-slate-500">
+          <span className="font-medium text-slate-400">iPhone:</span> for the reminders to work, tap Copy link, then
+          go to Settings → Apps → Calendar → Calendar Accounts → Add Account → Other → Add Subscribed
+          Calendar. Paste the link, keep Use SSL on, turn Remove Alerts off, and tap Save.
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           <button
