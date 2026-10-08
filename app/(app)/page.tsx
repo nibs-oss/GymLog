@@ -23,6 +23,7 @@ function relativeDate(dateStr: string): string {
 
 interface SessionRow {
   id: string;
+  routine_id: string | null;
   date: string;
   is_rest_day: boolean;
   session_exercises: { count: number }[] | null;
@@ -55,6 +56,7 @@ async function fetchDashboardData() {
 
   const all = ((sessions ?? []) as unknown as SessionRow[]).map((s) => ({
     id: s.id,
+    routineId: s.routine_id,
     date: s.date,
     isRest: !!s.is_rest_day,
     routineName: s.routines?.name ?? null,
@@ -266,16 +268,24 @@ export default async function HomePage() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         {lastWorkout && (
-          <Link
-            href={`/history/${lastWorkout.id}`}
-            className="rounded-2xl border border-white/10 bg-slate-900/60 p-5 transition-colors hover:border-accent"
-          >
-            <p className="text-sm text-slate-400">Last workout · {relativeDate(lastWorkout.date)}</p>
-            <p className="mt-1 font-medium text-foreground">{lastWorkout.routineName ?? "Workout"}</p>
-            <p className="text-sm text-slate-400">
-              {lastWorkout.exCount} {lastWorkout.exCount === 1 ? "exercise" : "exercises"}
-            </p>
-          </Link>
+          <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-slate-900/60 p-5 transition-colors hover:border-accent">
+            <Link href={`/history/${lastWorkout.id}`} className="min-w-0 flex-1">
+              <p className="text-sm text-slate-400">Last workout · {relativeDate(lastWorkout.date)}</p>
+              <p className="mt-1 truncate font-medium text-foreground">{lastWorkout.routineName ?? "Workout"}</p>
+              <p className="text-sm text-slate-400">
+                {lastWorkout.exCount} {lastWorkout.exCount === 1 ? "exercise" : "exercises"}
+              </p>
+            </Link>
+            {/* Routine still exists and today is free: start it again in one tap */}
+            {lastWorkout.routineId && lastWorkout.routineName && !loggedToday && (
+              <Link
+                href={`/log/${lastWorkout.routineId}`}
+                className="shrink-0 rounded-lg border border-sky-400/40 px-3 py-2 text-sm font-medium text-accent hover:bg-sky-400/10"
+              >
+                ↻ Repeat
+              </Link>
+            )}
+          </div>
         )}
         <Link
           href="/bodyweight"
