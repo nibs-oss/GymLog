@@ -20,6 +20,7 @@ import {
   type WorkoutExercise,
 } from "@/lib/workout";
 import { errorMessage } from "@/lib/errors";
+import { addPending, isNetworkError, loadPending } from "@/lib/pending";
 
 interface RoutineExercise {
   id: string;
@@ -70,7 +71,7 @@ function clearDraft(routineId: string) {
 }
 
 interface Summary {
-  sessionId: string;
+  sessionId: string | null; // null = saved on this phone, waiting to upload
   exercises: number;
   sets: number;
   volume: number; // kg
@@ -165,12 +166,38 @@ function LogSession({
       setError("Fill in at least one set before finishing.");
       return;
     }
+    const today = phIsoDate();
+    if (loadPending().some((w) => w.date === today)) {
+      setError("You already finished a workout today. It's saved on this phone, waiting to upload.");
+      return;
+    }
     setSaving(true);
     const supabase = createBrowserClient();
+
+    const priorBest = Object.fromEntries(Object.entries(history).map(([k, h]) => [k, h.bestWeight]));
+    const totals = {
+      prs: findPRs(clean, priorBest),
+      exercises: clean.length,
+      sets: clean.reduce((n, ex) => n + ex.sets.length, 0),
+      volume: clean.reduce(
+        (v, ex) => v + ex.sets.reduce((sv, s) => sv + setVolume(s.weight, s.reps), 0),
+        0
+      ),
+    };
+
+    // No connection: keep the finished workout on this phone; PendingSync uploads it later
+    const saveOnPhone = () => {
+      addPending({ routineId: routine.id, routineName: routine.name, date: today, exercises: clean });
+      clearDraft(routine.id);
+      setSummary({ sessionId: null, ...totals, achievements: [] });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
     try {
-      const { data: { user } } = await supabase.auth.getUser();
+      if (!navigator.onLine) return saveOnPhone();
+      const { data: { user }, error: authErr } = await supabase.auth.getUser();
+      if (authErr && isNetworkError(authErr)) throw authErr;
       if (!user) throw new Error("Not authenticated");
-      const today = phIsoDate();
       if (await findLogOnDate(supabase, user.id, today)) {
         throw new Error("You already logged a workout or rest day today.");
       }
@@ -183,31 +210,18 @@ function LogSession({
       });
       clearDraft(routine.id);
 
-      const priorBest = Object.fromEntries(
-        Object.entries(history).map(([k, h]) => [k, h.bestWeight])
-      );
-      const prs = findPRs(clean, priorBest);
       // The workout is already saved; an achievements hiccup shouldn't report it as failed
       const earned = await awardAchievements(supabase, user.id, {
-        prCount: prs.length,
+        prCount: totals.prs.length,
         weeklyGoal,
       }).catch(() => [] as string[]);
 
-      setSummary({
-        sessionId,
-        exercises: clean.length,
-        sets: clean.reduce((n, ex) => n + ex.sets.length, 0),
-        volume: clean.reduce(
-          (v, ex) => v + ex.sets.reduce((sv, s) => sv + setVolume(s.weight, s.reps), 0),
-          0
-        ),
-        prs,
-        achievements: earned,
-      });
+      setSummary({ sessionId, ...totals, achievements: earned });
       window.scrollTo({ top: 0, behavior: "smooth" });
       router.refresh();
     } catch (err) {
-      setError(errorMessage(err, "Failed to save workout."));
+      if (isNetworkError(err)) saveOnPhone();
+      else setError(errorMessage(err, "Failed to save workout."));
     } finally {
       setSaving(false);
     }
@@ -217,9 +231,16 @@ function LogSession({
     return (
       <section className="mx-auto max-w-xl space-y-5">
         <div className="rounded-2xl border border-sky-400/25 bg-gradient-to-br from-sky-500/20 via-sky-400/5 to-transparent p-6 text-center">
-          <p className="text-4xl">🎉</p>
-          <h1 className="mt-2 text-2xl font-semibold">Workout saved!</h1>
+          <p className="text-4xl">{summary.sessionId ? "🎉" : "📶"}</p>
+          <h1 className="mt-2 text-2xl font-semibold">
+            {summary.sessionId ? "Workout saved!" : "Saved on this phone"}
+          </h1>
           <p className="mt-1 text-sm text-slate-400">{routine.name}</p>
+          {!summary.sessionId && (
+            <p className="mt-2 text-sm text-amber-300">
+              No connection right now. It&apos;ll upload automatically when you&apos;re back online.
+            </p>
+          )}
           <div className="mt-5 grid grid-cols-3 gap-3">
             {[
               ["Exercises", String(summary.exercises)],
@@ -278,12 +299,14 @@ function LogSession({
           >
             Done
           </Link>
-          <Link
-            href={`/history/${summary.sessionId}`}
-            className="flex-1 rounded-lg border border-white/10 px-4 py-2.5 text-center text-sm font-medium text-foreground hover:bg-white/5"
-          >
-            View / edit
-          </Link>
+          {summary.sessionId && (
+            <Link
+              href={`/history/${summary.sessionId}`}
+              className="flex-1 rounded-lg border border-white/10 px-4 py-2.5 text-center text-sm font-medium text-foreground hover:bg-white/5"
+            >
+              View / edit
+            </Link>
+          )}
         </div>
       </section>
     );
