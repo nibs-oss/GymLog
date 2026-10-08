@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import { phIsoDate } from "@/lib/fitness";
 
 /** Shows a browser notification (once per day) suggesting a rest day. */
-export function RestReminderNotifier({ streak }: { streak: number }) {
+export function RestReminderNotifier({ streak, muscles = [] }: { streak: number; muscles?: string[] }) {
+  const musclesText = muscles.join(" and ");
   useEffect(() => {
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     const key = "gymlog.restReminderShown";
@@ -16,8 +17,10 @@ export function RestReminderNotifier({ streak }: { streak: number }) {
       return;
     }
     new Notification("Time for a rest day? 😴", {
-      body: `You've trained ${streak} days in a row. Recovery helps you grow stronger.`,
+      body: `You've trained ${streak} days in a row${
+        musclesText ? `, mostly ${musclesText}` : ""
+      }. Recovery helps you grow stronger.`,
     });
-  }, [streak]);
+  }, [streak, musclesText]);
   return null;
 }

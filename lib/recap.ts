@@ -1,3 +1,4 @@
+import { libraryMuscle } from "./exercises.ts";
 import { addDaysIso, setVolume } from "./fitness.ts";
 import { newWeightPRs, type RecordSet } from "./records.ts";
 
@@ -30,4 +31,18 @@ export function weekRecap(rows: RecordSet[], gymDates: Iterable<string>, weekSta
     previousVolume: volumeBetween(rows, addDaysIso(weekStart, -7), addDaysIso(weekStart, -1)),
     prs: newWeightPRs(rows, weekStart, to),
   };
+}
+
+/** Muscle groups with the most sets between `from` and `to`, most-trained first. */
+export function topMuscles(rows: RecordSet[], from: string, to: string, limit = 2): string[] {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    if (r.date < from || r.date > to) continue;
+    const muscle = r.muscle ?? libraryMuscle(r.exercise);
+    if (muscle) counts.set(muscle, (counts.get(muscle) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([m]) => m);
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import { addDaysIso, computeStreak, daysBetweenIso, isAlreadyLogged, phIsoDate, weekStartIso } from "@/lib/fitness";
 import { fetchLoggedSets } from "@/lib/history";
-import { weekRecap, type WeekRecap } from "@/lib/recap";
+import { topMuscles, weekRecap, type WeekRecap } from "@/lib/recap";
 import { getUserSettings } from "@/lib/settings";
 import { formatWeight, type Units } from "@/lib/units";
 import { RestReminderNotifier } from "@/components/rest-reminder";
@@ -68,9 +68,13 @@ async function fetchDashboardData() {
   const weekStart = weekStartIso();
   const lastWeekStart = addDaysIso(weekStart, -7);
 
+  const streak = computeStreak(gymDates);
+
   return {
     settings,
-    streak: computeStreak(gymDates),
+    streak,
+    // What the current run of training days hit hardest, for the rest reminder
+    streakMuscles: topMuscles(rows, addDaysIso(today, -streak), today),
     weekGymDays: new Set(gymDates.filter((d) => d >= weekStart && d <= today)).size,
     totalWorkouts: gymDates.length,
     loggedToday: isAlreadyLogged(all.map((s) => s.date)),
@@ -174,7 +178,8 @@ export default async function HomePage() {
     );
   }
 
-  const { settings, streak, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } = data;
+  const { settings, streak, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
+    data;
   const goal = settings.weekly_goal;
   const remaining = Math.max(0, goal - weekGymDays);
   const suggestRest = settings.rest_day_reminders && streak >= REST_AFTER_DAYS && !loggedToday;
@@ -222,12 +227,16 @@ export default async function HomePage() {
           <span className="text-2xl">😴</span>
           <div className="flex-1">
             <p className="font-medium text-foreground">You&apos;ve trained {streak} days in a row</p>
-            <p className="text-sm text-slate-400">Consider a rest day. Muscles grow while you recover.</p>
+            <p className="text-sm text-slate-400">
+              {streakMuscles.length
+                ? `Mostly ${streakMuscles.join(" and ")} lately. Give them a day off; muscles grow while you recover.`
+                : "Consider a rest day. Muscles grow while you recover."}
+            </p>
           </div>
           <Link href="/log/rest" className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-accent hover:bg-sky-400/10">
             Log rest
           </Link>
-          <RestReminderNotifier streak={streak} />
+          <RestReminderNotifier streak={streak} muscles={streakMuscles} />
         </div>
       )}
 

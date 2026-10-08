@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { weekRecap } from "./recap.ts";
+import { topMuscles, weekRecap } from "./recap.ts";
 import type { RecordSet } from "./records.ts";
 
 const set = (date: string, exercise: string, weight: number | null, reps: number | null): RecordSet => ({
@@ -36,4 +36,17 @@ test("an empty week", () => {
   assert.equal(r.workouts, 0);
   assert.equal(r.volume, 0);
   assert.deepEqual(r.prs, []);
+});
+
+test("top muscles by sets in a range, falling back to the exercise library", () => {
+  const sets = [
+    { ...set("2026-10-01", "Bench Press", 60, 8), muscle: "Chest" },
+    { ...set("2026-10-01", "Bench Press", 60, 8), muscle: "Chest" },
+    { ...set("2026-10-02", "Overhead Press", 40, 8), muscle: "Shoulders" },
+    set("2026-10-02", "Squat", 100, 5), // no muscle saved -> library says Quads
+    set("2026-10-02", "Squat", 100, 5),
+    set("2026-10-02", "Squat", 100, 5),
+    { ...set("2026-09-20", "Deadlift", 140, 3), muscle: "Back" }, // outside the range
+  ];
+  assert.deepEqual(topMuscles(sets, "2026-10-01", "2026-10-03"), ["Quads", "Chest"]);
 });
