@@ -4,6 +4,8 @@
 -- It signs in "as" one of your users (so row-level security is really tested),
 -- performs every write the app does, checks the results, then ROLLS EVERYTHING
 -- BACK. No data is changed. The output is a table of PASS / FAIL rows.
+-- A failed step undoes its own changes and clears its ids; tests that depend
+-- on it report SKIP instead of failing for an unrelated reason.
 --
 -- To test a specific account, put its email here (otherwise the oldest user is used):
 --   select set_config('healthcheck.email', 'you@example.com', false);
@@ -100,11 +102,15 @@ begin
         values (r1::uuid, 'Overhead Press', 'Shoulders', 2, 3, 10) returning id::text into re2;
       results := array_append(results, 'PASS|Create routine + exercises|');
     exception when others then
+      r1 := null; re1 := null; re2 := null;
       results := results || ('FAIL|Create routine + exercises|' || sqlerrm);
     end;
 
     -- 2. Edit routine: rename, update, add, remove exercise (routines/[id] edit)
     begin
+      if r1 is null then
+        raise exception using errcode = 'HCSKP', message = 'skipped: "Create routine + exercises" failed';
+      end if;
       update public.routines set name = 'HC Push Day v2' where id::text = r1;
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'rename updated % rows', n; end if;
@@ -115,12 +121,17 @@ begin
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'delete exercise removed % rows', n; end if;
       results := array_append(results, 'PASS|Edit routine (rename/update/add/remove)|');
-    exception when others then
+    exception when sqlstate 'HCSKP' then
+      results := array_append(results, 'SKIP|Edit routine (rename/update/add/remove)|' || sqlerrm);
+    when others then
       results := results || ('FAIL|Edit routine (rename/update/add/remove)|' || sqlerrm);
     end;
 
     -- 3. Duplicate routine
     begin
+      if r1 is null then
+        raise exception using errcode = 'HCSKP', message = 'skipped: "Create routine + exercises" failed';
+      end if;
       insert into public.routines (name, user_id) values ('HC Push Day (copy)', uid) returning id::text into r2;
       insert into public.routine_exercises (routine_id, name, muscle_group, position, default_sets, default_reps)
         select r2::uuid, name, muscle_group, position, default_sets, default_reps
@@ -128,12 +139,17 @@ begin
       select count(*) into n from public.routine_exercises where routine_id::text = r2;
       if n <> 2 then raise exception 'copy has % exercises, expected 2', n; end if;
       results := array_append(results, 'PASS|Duplicate routine|');
-    exception when others then
+    exception when sqlstate 'HCSKP' then
+      results := array_append(results, 'SKIP|Duplicate routine|' || sqlerrm);
+    when others then
       results := results || ('FAIL|Duplicate routine|' || sqlerrm);
     end;
 
     -- 4. Log a workout with decimal (lbs-converted) weights (log/[routineId])
     begin
+      if r1 is null then
+        raise exception using errcode = 'HCSKP', message = 'skipped: "Create routine + exercises" failed';
+      end if;
       insert into public.workout_sessions (user_id, routine_id, date, is_rest_day)
         values (uid, r1::uuid, base, false) returning id::text into s1;
       insert into public.session_exercises (session_id, name, muscle_group, position)
@@ -145,12 +161,18 @@ begin
       select weight into v from public.sets where session_exercise_id::text = se1 and set_number = 1;
       if v <> 45.359 then raise exception 'weight stored as %', v; end if;
       results := array_append(results, 'PASS|Log workout (session, exercises, sets, decimal kg)|');
-    exception when others then
+    exception when sqlstate 'HCSKP' then
+      results := array_append(results, 'SKIP|Log workout (session, exercises, sets, decimal kg)|' || sqlerrm);
+    when others then
+      s1 := null; se1 := null; se2 := null;
       results := results || ('FAIL|Log workout (session, exercises, sets, decimal kg)|' || sqlerrm);
     end;
 
     -- 5. Edit a logged workout: change date, clear + re-insert exercises (history/[id])
     begin
+      if s1 is null then
+        raise exception using errcode = 'HCSKP', message = 'skipped: "Log workout" failed';
+      end if;
       update public.workout_sessions set date = base + 1 where id::text = s1;
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'date update changed % rows (missing UPDATE policy?)', n; end if;
@@ -162,12 +184,17 @@ begin
       select count(*) into n from public.sets where session_exercise_id::text = se1;
       if n <> 1 then raise exception 'expected 1 set after edit, found %', n; end if;
       results := array_append(results, 'PASS|Edit logged workout (date + sets)|');
-    exception when others then
+    exception when sqlstate 'HCSKP' then
+      results := array_append(results, 'SKIP|Edit logged workout (date + sets)|' || sqlerrm);
+    when others then
       results := results || ('FAIL|Edit logged workout (date + sets)|' || sqlerrm);
     end;
 
     -- 6. Delete a routine that has a logged workout: workout kept, link cleared
     begin
+      if s1 is null then
+        raise exception using errcode = 'HCSKP', message = 'skipped: "Log workout" failed';
+      end if;
       delete from public.routines where id::text = r1;
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'deleted % routines', n; end if;
@@ -176,12 +203,17 @@ begin
       select count(*) into n from public.routine_exercises where routine_id::text = r1;
       if n <> 0 then raise exception '% routine exercises left behind', n; end if;
       results := array_append(results, 'PASS|Delete routine used by a workout (history kept)|');
-    exception when others then
+    exception when sqlstate 'HCSKP' then
+      results := array_append(results, 'SKIP|Delete routine used by a workout (history kept)|' || sqlerrm);
+    when others then
       results := results || ('FAIL|Delete routine used by a workout (history kept)|' || sqlerrm);
     end;
 
     -- 7. Delete a workout directly: exercises and sets cascade away
     begin
+      if s1 is null then
+        raise exception using errcode = 'HCSKP', message = 'skipped: "Log workout" failed';
+      end if;
       delete from public.workout_sessions where id::text = s1;
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'deleted % workouts', n; end if;
@@ -190,7 +222,9 @@ begin
       select count(*) into n from public.session_exercises where session_id::text = s1;
       if n <> 0 then raise exception '% exercises left behind', n; end if;
       results := array_append(results, 'PASS|Delete workout (exercises + sets removed)|');
-    exception when others then
+    exception when sqlstate 'HCSKP' then
+      results := array_append(results, 'SKIP|Delete workout (exercises + sets removed)|' || sqlerrm);
+    when others then
       results := results || ('FAIL|Delete workout (exercises + sets removed)|' || sqlerrm);
     end;
 
@@ -326,4 +360,5 @@ begin
     values ('INFO', 'Tested as user', (select email from auth.users where id = uid));
 end $$;
 
-select status, test, detail from hc_results order by (status = 'FAIL') desc, n;
+select status, test, detail from hc_results
+ order by (status = 'FAIL') desc, (status = 'SKIP') desc, n;
