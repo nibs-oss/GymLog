@@ -8,8 +8,8 @@ export const ACHIEVEMENTS: Record<string, { title: string; description: string; 
   workouts_25: { title: "25 Workouts", description: "Logged 25 workouts", icon: "🏋️" },
   workouts_50: { title: "50 Workouts", description: "Logged 50 workouts", icon: "🥈" },
   workouts_100: { title: "100 Workouts", description: "Logged 100 workouts", icon: "🥇" },
-  streak_3: { title: "3-Day Streak", description: "Trained 3 days in a row", icon: "🔥" },
-  streak_7: { title: "7-Day Streak", description: "Trained 7 days in a row", icon: "⚡" },
+  streak_3: { title: "3-Day Streak", description: "Reached a 3-day training streak", icon: "🔥" },
+  streak_7: { title: "7-Day Streak", description: "Reached a 7-day training streak", icon: "⚡" },
   weekly_goal: { title: "Goal Crusher", description: "Hit your weekly gym goal", icon: "✅" },
   first_pr: { title: "Personal Best", description: "Set a new personal record", icon: "🏆" },
 };

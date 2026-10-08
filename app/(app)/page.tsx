@@ -4,9 +4,10 @@ import Link from "next/link";
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import {
   addDaysIso,
-  computeStreak,
+  consecutiveDays,
   daysBetweenIso,
   isAlreadyLogged,
+  streakInfo,
   phIsoDate,
   weekdayOf,
   weekStartIso,
@@ -77,7 +78,9 @@ async function fetchDashboardData() {
   const weekStart = weekStartIso();
   const lastWeekStart = addDaysIso(weekStart, -7);
 
-  const streak = computeStreak(gymDates);
+  // Streak forgives one missed day per week; the rest reminder counts true back-to-back days
+  const { streak, frozen } = streakInfo(gymDates);
+  const inARow = consecutiveDays(gymDates);
 
   const lastMonth = addDaysIso(`${today.slice(0, 7)}-01`, -1).slice(0, 7); // YYYY-MM
 
@@ -104,8 +107,10 @@ async function fetchDashboardData() {
     settings,
     plan,
     streak,
+    freezeUsedThisWeek: frozen.some((d) => d >= weekStart),
+    inARow,
     // What the current run of training days hit hardest, for the rest reminder
-    streakMuscles: topMuscles(rows, addDaysIso(today, -streak), today),
+    streakMuscles: topMuscles(rows, addDaysIso(today, -inARow), today),
     weekGymDays: new Set(gymDates.filter((d) => d >= weekStart && d <= today)).size,
     totalWorkouts: gymDates.length,
     loggedToday: isAlreadyLogged(all.map((s) => s.date)),
@@ -287,11 +292,11 @@ export default async function HomePage() {
     );
   }
 
-  const { settings, plan, reportMonth, streak, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
+  const { settings, plan, reportMonth, streak, freezeUsedThisWeek, inARow, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
     data;
   const goal = settings.weekly_goal;
   const remaining = Math.max(0, goal - weekGymDays);
-  const suggestRest = settings.rest_day_reminders && streak >= REST_AFTER_DAYS && !loggedToday;
+  const suggestRest = settings.rest_day_reminders && inARow >= REST_AFTER_DAYS && !loggedToday;
 
   if (recent.length === 0) {
     return (
@@ -335,7 +340,7 @@ export default async function HomePage() {
       {suggestRest && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/5 p-4">
           <div className="flex-1">
-            <p className="font-medium text-foreground">You&apos;ve trained {streak} days in a row</p>
+            <p className="font-medium text-foreground">You&apos;ve trained {inARow} days in a row</p>
             <p className="text-sm text-slate-400">
               {streakMuscles.length
                 ? `Mostly ${streakMuscles.join(" and ")} lately. Give them a day off; muscles grow while you recover.`
@@ -345,7 +350,7 @@ export default async function HomePage() {
           <Link href="/log/rest" className="shrink-0 rounded-lg px-3 py-1.5 text-sm font-medium text-accent hover:bg-sky-400/10">
             Log rest
           </Link>
-          <RestReminderNotifier streak={streak} muscles={streakMuscles} />
+          <RestReminderNotifier streak={inARow} muscles={streakMuscles} />
         </div>
       )}
 
@@ -371,7 +376,15 @@ export default async function HomePage() {
             <p className="mt-1 text-3xl font-semibold tabular-nums text-accent">
               {streak}
             </p>
-            <p className="text-xs text-slate-500">{streak === 1 ? "day" : "days"} in a row</p>
+            <p className="text-xs text-slate-500">training {streak === 1 ? "day" : "days"}</p>
+            {streak > 0 && (
+              <p
+                className="mt-1 text-[11px] text-slate-500"
+                title="One missed day per week (Mon–Sun) doesn't break your streak"
+              >
+                {freezeUsedThisWeek ? "Freeze used this week" : "1 freeze left this week"}
+              </p>
+            )}
           </div>
           <div className="rounded-2xl border border-white/10 bg-slate-900/60 p-5">
             <p className="text-sm text-slate-400">Workouts</p>

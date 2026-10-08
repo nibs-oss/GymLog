@@ -71,15 +71,55 @@ export function isAlreadyLogged(logDates: Iterable<string>, now: Date = new Date
   return false;
 }
 
-/** Consecutive gym days ending today or yesterday (a streak survives until a day is missed). */
-export function computeStreak(gymDates: Iterable<string>, now: Date = new Date()): number {
+/** Back-to-back gym days ending today or yesterday (no gaps allowed). */
+export function consecutiveDays(gymDates: Iterable<string>, now: Date = new Date()): number {
   const days = new Set(gymDates);
   let cursor = phIsoDate(now);
   if (!days.has(cursor)) cursor = addDaysIso(cursor, -1);
-  let streak = 0;
+  let count = 0;
   while (days.has(cursor)) {
-    streak++;
+    count++;
     cursor = addDaysIso(cursor, -1);
   }
-  return streak;
+  return count;
+}
+
+/**
+ * Training streak with a weekly freeze: one missed day per Monday–Sunday
+ * week is forgiven automatically; a second miss in the same week ends the
+ * streak. Today never breaks it (the day isn't over). `streak` counts
+ * training days; `frozen` lists the forgiven days inside the streak.
+ */
+export function streakInfo(gymDates: Iterable<string>, now: Date = new Date()): { streak: number; frozen: string[] } {
+  const days = new Set(gymDates);
+  const today = phIsoDate(now);
+  const usedWeeks = new Set<string>();
+  const frozen: string[] = [];
+  let streak = 0;
+  let oldestTrained: string | null = null;
+  let cursor = days.has(today) ? today : addDaysIso(today, -1);
+  if (days.has(today)) {
+    streak++;
+    oldestTrained = today;
+    cursor = addDaysIso(today, -1);
+  }
+  for (let guard = 0; guard < 3660; guard++) {
+    if (days.has(cursor)) {
+      streak++;
+      oldestTrained = cursor;
+    } else {
+      const week = weekStartIso(cursor);
+      if (usedWeeks.has(week)) break;
+      usedWeeks.add(week);
+      frozen.push(cursor);
+    }
+    cursor = addDaysIso(cursor, -1);
+  }
+  // A freeze only counts if training came before it
+  return { streak, frozen: oldestTrained ? frozen.filter((d) => d > oldestTrained!) : [] };
+}
+
+/** Training streak (see streakInfo). */
+export function computeStreak(gymDates: Iterable<string>, now: Date = new Date()): number {
+  return streakInfo(gymDates, now).streak;
 }

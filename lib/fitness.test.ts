@@ -4,9 +4,11 @@ import {
   addDaysIso,
   addMonthsIso,
   computeStreak,
+  consecutiveDays,
   daysBetweenIso,
   isAlreadyLogged,
   phIsoDate,
+  streakInfo,
   weekdayOf,
   weekStartIso,
 } from "./fitness.ts";
@@ -64,8 +66,30 @@ test("streak uses the PH date for 'today'", () => {
   assert.equal(computeStreak(gym, ph("2026-10-09T00:30:00")), 3);
   // 1:00 AM PH on 10/8 (UTC 10/7): today's workout counts.
   assert.equal(computeStreak(gym, ph("2026-10-08T01:00:00")), 3);
-  // Missed 10/9 entirely -> broken on 10/10.
-  assert.equal(computeStreak(gym, ph("2026-10-10T00:30:00")), 0);
+  // Missed Fri 10/9: that week's freeze covers it, so the streak survives on 10/10.
+  assert.equal(computeStreak(gym, ph("2026-10-10T00:30:00")), 3);
+  // Missed Fri 10/9 and Sat 10/10: a second miss in the same week ends it.
+  assert.equal(computeStreak(gym, ph("2026-10-11T00:30:00")), 0);
+});
+
+test("streak freeze: one forgiven miss per Monday–Sunday week", () => {
+  // Week of Sep 28: trains Mon–Wed, misses Thu, trains Fri–Sun.
+  // Week of Oct 5: trains Mon, misses Tue, trains Wed–Thu.
+  const gym = [
+    "2026-09-28", "2026-09-29", "2026-09-30", "2026-10-02", "2026-10-03", "2026-10-04",
+    "2026-10-05", "2026-10-07", "2026-10-08",
+  ];
+  const info = streakInfo(gym, ph("2026-10-08T20:00:00"));
+  assert.equal(info.streak, 9); // training days only; frozen days keep it alive but don't add
+  assert.deepEqual(info.frozen, ["2026-10-06", "2026-10-01"]);
+  // Back-to-back days (for the rest reminder) still stop at the first gap
+  assert.equal(consecutiveDays(gym, ph("2026-10-08T20:00:00")), 2);
+});
+
+test("streak freeze never counts before the first training day", () => {
+  assert.deepEqual(streakInfo([], ph("2026-10-08T20:00:00")), { streak: 0, frozen: [] });
+  // Trained only on Wed; Tue missed (frozen) then Mon missed in the same week -> streak is just Wed
+  assert.deepEqual(streakInfo(["2026-10-07"], ph("2026-10-08T09:00:00")), { streak: 1, frozen: [] });
 });
 
 test("weekday of a PH date", () => {
