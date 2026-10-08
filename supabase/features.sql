@@ -2,7 +2,8 @@
 -- Run AFTER repair.sql, in Supabase dashboard -> SQL Editor. Safe to re-run.
 -- Adds: muscle groups, bodyweight log, decimal weights (for kg/lbs), optional weight/reps per set,
 --       achievement de-duplication, all-or-nothing workout saving (save_workout),
---       weekly plan (user_settings.schedule), per-exercise units (user_settings.exercise_units).
+--       weekly plan (user_settings.schedule), per-exercise units (user_settings.exercise_units),
+--       calendar subscription (user_settings.calendar_token, calendar_plan()).
 
 begin;
 
@@ -28,6 +29,30 @@ alter table public.user_settings add column if not exists schedule jsonb not nul
 
 -- Per-exercise kg/lbs override: exerciseKey(name) -> "kg" | "lbs" (weights are still stored in kg)
 alter table public.user_settings add column if not exists exercise_units jsonb not null default '{}'::jsonb;
+
+-- Calendar subscription: a private random token per user. Calendar apps fetch
+-- /api/calendar/<token>.ics without logging in, so calendar_plan() returns
+-- only that user's weekly plan (routine names per weekday) for a valid token.
+alter table public.user_settings add column if not exists calendar_token uuid;
+create unique index if not exists user_settings_calendar_token_key
+  on public.user_settings (calendar_token) where calendar_token is not null;
+
+create or replace function public.calendar_plan(p_token uuid)
+returns table (weekday int, routine_name text)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select d.key::int, r.name
+  from user_settings s
+  cross join lateral jsonb_each_text(s.schedule) as d(key, value)
+  join routines r on r.id::text = d.value and r.user_id = s.user_id
+  where p_token is not null and s.calendar_token = p_token;
+$$;
+
+revoke execute on function public.calendar_plan(uuid) from public;
+grant execute on function public.calendar_plan(uuid) to anon, authenticated;
 
 -- Muscle group per exercise (routine template + logged copy)
 alter table public.routine_exercises add column if not exists muscle_group text;

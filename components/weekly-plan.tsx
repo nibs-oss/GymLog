@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/utils/supabase/client";
 import { errorMessage } from "@/lib/errors";
 import type { UserSettings, WeeklySchedule } from "@/lib/settings";
+import { saveSettingsPatch } from "@/lib/save-settings";
 
 /** Monday-first, values are JS weekdays (0 = Sunday) */
 export const PLAN_DAYS = [
@@ -68,6 +69,48 @@ export function WeeklyPlan({
     setTimeout(() => setStatus("idle"), 1500);
   };
 
+  // Calendar subscription (private link, created on first use)
+  const [calToken, setCalToken] = useState(settings.calendar_token);
+  const [calStatus, setCalStatus] = useState<string | null>(null);
+  const feedPath = (token: string) => `${window.location.host}/api/calendar/${token}.ics`;
+
+  const ensureToken = async (fresh = false) => {
+    if (calToken && !fresh) return calToken;
+    const token = crypto.randomUUID();
+    const err = await saveSettingsPatch(createClient(), { calendar_token: token });
+    if (err) {
+      setCalStatus(err);
+      return null;
+    }
+    setCalToken(token);
+    return token;
+  };
+
+  const addToCalendar = async () => {
+    setCalStatus(null);
+    const token = await ensureToken();
+    // webcal:// makes iPhone/Mac Calendar offer to subscribe
+    if (token) window.location.href = `webcal://${feedPath(token)}`;
+  };
+
+  const copyLink = async () => {
+    setCalStatus(null);
+    const token = await ensureToken();
+    if (!token) return;
+    try {
+      await navigator.clipboard.writeText(`https://${feedPath(token)}`);
+      setCalStatus("Link copied. In Google Calendar: Other calendars → From URL.");
+    } catch {
+      setCalStatus(`https://${feedPath(token)}`);
+    }
+  };
+
+  const resetLink = async () => {
+    if (!confirm("Reset your calendar link? Calendars subscribed with the old link will go empty.")) return;
+    setCalStatus(null);
+    if (await ensureToken(true)) setCalStatus("New link created. Add it to your calendar again.");
+  };
+
   const planned = PLAN_DAYS.filter(([d]) => schedule[d] && schedule[d] !== "rest").length;
 
   return (
@@ -105,6 +148,41 @@ export function WeeklyPlan({
         ))}
       </div>
       {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+
+      <div className="mt-5 border-t border-white/5 pt-4">
+        <p className="text-sm font-medium text-slate-200">Calendar reminders</p>
+        <p className="mt-1 text-xs text-slate-500">
+          Adds your plan to your phone&apos;s calendar, with a reminder at 8:00 PM the night before each
+          training day. Changes here update the calendar automatically. On iPhone, tap Subscribe and turn
+          off &ldquo;Remove Alerts&rdquo;.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={addToCalendar}
+            className="rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-slate-950 hover:bg-accent/90"
+          >
+            Add to Calendar
+          </button>
+          <button
+            type="button"
+            onClick={copyLink}
+            className="rounded-lg border border-white/10 px-3 py-2 text-sm font-medium hover:bg-white/5"
+          >
+            Copy link
+          </button>
+          {calToken && (
+            <button
+              type="button"
+              onClick={resetLink}
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-400 hover:bg-white/5 hover:text-foreground"
+            >
+              Reset link
+            </button>
+          )}
+        </div>
+        {calStatus && <p className="mt-2 break-all text-xs text-slate-400">{calStatus}</p>}
+      </div>
     </div>
   );
 }

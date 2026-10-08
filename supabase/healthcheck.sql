@@ -86,6 +86,10 @@ begin
   results := array_append(results, case when n = 2 then 'PASS|Weekly plan + exercise units columns exist|'
                                         else 'FAIL|Weekly plan + exercise units columns exist|run features.sql' end);
 
+  results := array_append(results, case when to_regprocedure('public.calendar_plan(uuid)') is not null
+                                        then 'PASS|Calendar feed function exists|'
+                                        else 'FAIL|Calendar feed function exists|run features.sql' end);
+
   results := results || (case when to_regclass('public.workout_sessions_user_date_key') is not null
                               then 'PASS|One log per day index exists|'
                               else 'FAIL|One log per day index exists|missing: run repair.sql (lists any duplicate days)' end);

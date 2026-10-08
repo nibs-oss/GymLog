@@ -42,6 +42,8 @@ export async function updateSession(request: NextRequest) {
 
   // Email links (password reset) sign the user in there, so let everyone through.
   if (pathname.startsWith("/auth/")) return supabaseResponse;
+  // Calendar apps fetch the plan feed without a login; the private token in the URL is the key
+  if (pathname.startsWith("/api/calendar/")) return supabaseResponse;
 
   // Opening /reset-password without a valid reset link: ask for a new link.
   if (!user && pathname === "/reset-password") {

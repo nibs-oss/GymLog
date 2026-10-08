@@ -12,6 +12,8 @@ export interface UserSettings {
   schedule: WeeklySchedule;
   /** Per-exercise unit overrides, keyed by exerciseKey(name) (e.g. dumbbells in lbs) */
   exercise_units: Record<string, Units>;
+  /** Private token for the calendar subscription link (null until created) */
+  calendar_token: string | null;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -20,6 +22,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
   rest_day_reminders: false,
   schedule: {},
   exercise_units: {},
+  calendar_token: null,
 };
 
 function asExerciseUnits(value: unknown): Record<string, Units> {
@@ -59,5 +62,6 @@ export async function getUserSettings(
     rest_day_reminders: !!data.rest_day_reminders,
     schedule: asSchedule(data.schedule),
     exercise_units: asExerciseUnits(data.exercise_units),
+    calendar_token: typeof data.calendar_token === "string" ? data.calendar_token : null,
   };
 }
