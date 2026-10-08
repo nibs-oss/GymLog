@@ -2,7 +2,15 @@ export const dynamic = "force-dynamic";
 
 import Link from "next/link";
 import { createClient as createServerClient } from "@/utils/supabase/server";
-import { addDaysIso, computeStreak, daysBetweenIso, isAlreadyLogged, phIsoDate, weekStartIso } from "@/lib/fitness";
+import {
+  addDaysIso,
+  computeStreak,
+  daysBetweenIso,
+  isAlreadyLogged,
+  phIsoDate,
+  weekdayOf,
+  weekStartIso,
+} from "@/lib/fitness";
 import { fetchLoggedSets } from "@/lib/history";
 import { topMuscles, weekRecap, type WeekRecap } from "@/lib/recap";
 import { getUserSettings } from "@/lib/settings";
@@ -37,7 +45,7 @@ async function fetchDashboardData() {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [{ data: sessions }, settings, { data: latestWeight }, rows] = await Promise.all([
+  const [{ data: sessions }, settings, { data: latestWeight }, rows, { data: routineRows }] = await Promise.all([
     supabase
       .from("workout_sessions")
       .select("id, routine_id, date, is_rest_day, created_at, session_exercises(count), routines(name)")
@@ -52,6 +60,7 @@ async function fetchDashboardData() {
       .order("date", { ascending: false })
       .limit(1),
     fetchLoggedSets(supabase, user.id),
+    supabase.from("routines").select("id, name").eq("user_id", user.id),
   ]);
 
   const all = ((sessions ?? []) as unknown as SessionRow[]).map((s) => ({
@@ -70,8 +79,28 @@ async function fetchDashboardData() {
 
   const streak = computeStreak(gymDates);
 
+  // This week's plan (Mon–Sun) with what was actually logged
+  const routineName = new Map((routineRows ?? []).map((r) => [r.id as string, r.name as string]));
+  const loggedDates = new Set(all.map((s) => s.date));
+  const plan = Object.keys(settings.schedule).length
+    ? Array.from({ length: 7 }, (_, i) => {
+        const date = addDaysIso(weekStart, i);
+        const entry = settings.schedule[weekdayOf(date)] ?? null;
+        return {
+          date,
+          isToday: date === today,
+          isPast: date < today,
+          done: loggedDates.has(date),
+          rest: entry === "rest",
+          routineId: entry && entry !== "rest" && routineName.has(entry) ? entry : null,
+          routineName: entry && entry !== "rest" ? routineName.get(entry) ?? null : null,
+        };
+      })
+    : null;
+
   return {
     settings,
+    plan,
     streak,
     // What the current run of training days hit hardest, for the rest reminder
     streakMuscles: topMuscles(rows, addDaysIso(today, -streak), today),
@@ -115,6 +144,82 @@ function GoalRing({ value, goal }: { value: number; goal: number }) {
         </span>
         <span className="text-[10px] uppercase tracking-wide text-slate-400">days</span>
       </div>
+    </div>
+  );
+}
+
+type PlanDay = {
+  date: string;
+  isToday: boolean;
+  isPast: boolean;
+  done: boolean;
+  rest: boolean;
+  routineId: string | null;
+  routineName: string | null;
+};
+
+const DAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
+
+/** Today's planned session with a start button, plus the Mon–Sun plan vs what was logged */
+function PlanCard({ plan, loggedToday }: { plan: PlanDay[]; loggedToday: boolean }) {
+  const today = plan.find((d) => d.isToday)!;
+  const title = today.rest
+    ? "Rest day"
+    : today.routineName
+      ? today.routineName
+      : "Nothing planned";
+  return (
+    <div className="rounded-2xl border border-sky-400/20 bg-gradient-to-br from-sky-500/15 via-sky-400/5 to-transparent p-5">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm text-slate-400">Today&apos;s plan</p>
+          <p className="truncate text-lg font-semibold text-foreground">
+            {today.rest ? "😴 " : today.routineName ? "🏋️ " : ""}
+            {title}
+          </p>
+        </div>
+        {loggedToday ? (
+          <span className="shrink-0 rounded-lg px-3 py-2 text-sm font-medium text-emerald-400">✓ Done</span>
+        ) : today.routineId ? (
+          <Link
+            href={`/log/${today.routineId}`}
+            className="shrink-0 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-accent/90"
+          >
+            Start
+          </Link>
+        ) : today.rest ? (
+          <Link
+            href="/log/rest"
+            className="shrink-0 rounded-lg border border-white/10 px-3 py-2 text-sm font-medium hover:bg-white/5"
+          >
+            Log rest
+          </Link>
+        ) : null}
+      </div>
+      <ol className="mt-4 grid grid-cols-7 gap-1.5 text-center">
+        {plan.map((d, i) => {
+          const missed = d.isPast && !d.done && !!d.routineName;
+          const mark = d.done ? "✓" : d.rest ? "😴" : d.routineName ? "•" : "";
+          return (
+            <li
+              key={d.date}
+              title={d.rest ? "Rest day" : d.routineName ?? "Nothing planned"}
+              className={`rounded-lg py-1.5 ${d.isToday ? "ring-2 ring-accent" : ""} ${
+                d.done ? "bg-accent/20" : missed ? "bg-red-500/10" : "bg-slate-950/40"
+              }`}
+            >
+              <span className="block text-[11px] font-medium text-slate-400">{DAY_LETTERS[i]}</span>
+              <span
+                className={`block h-5 text-sm font-semibold ${
+                  d.done ? "text-accent" : missed ? "text-red-400" : "text-slate-400"
+                }`}
+              >
+                {missed ? "✕" : mark}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
@@ -178,7 +283,7 @@ export default async function HomePage() {
     );
   }
 
-  const { settings, streak, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
+  const { settings, plan, streak, streakMuscles, weekGymDays, totalWorkouts, loggedToday, lastWorkout, recent, bodyweight, lastWeek } =
     data;
   const goal = settings.weekly_goal;
   const remaining = Math.max(0, goal - weekGymDays);
@@ -221,6 +326,8 @@ export default async function HomePage() {
           {loggedToday ? "✓ Logged today" : "Log Workout"}
         </Link>
       </div>
+
+      {plan && <PlanCard plan={plan} loggedToday={loggedToday} />}
 
       {suggestRest && (
         <div className="flex items-start gap-3 rounded-2xl border border-amber-400/30 bg-amber-400/5 p-4">

@@ -81,6 +81,11 @@ begin
                                    || '|sets.weight / reps optional (bodyweight sets)|'
                                    || case when n = 2 then '' else 'run features.sql' end);
 
+  select count(*) into n from information_schema.columns
+   where table_schema = 'public' and table_name = 'user_settings' and column_name = 'schedule';
+  results := array_append(results, case when n = 1 then 'PASS|Weekly plan column exists|'
+                                        else 'FAIL|Weekly plan column exists|run features.sql' end);
+
   results := results || (case when to_regclass('public.workout_sessions_user_date_key') is not null
                               then 'PASS|One log per day index exists|'
                               else 'FAIL|One log per day index exists|missing: run repair.sql (lists any duplicate days)' end);

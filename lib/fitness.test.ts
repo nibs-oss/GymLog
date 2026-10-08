@@ -7,6 +7,7 @@ import {
   daysBetweenIso,
   isAlreadyLogged,
   phIsoDate,
+  weekdayOf,
   weekStartIso,
 } from "./fitness.ts";
 
@@ -65,4 +66,11 @@ test("streak uses the PH date for 'today'", () => {
   assert.equal(computeStreak(gym, ph("2026-10-08T01:00:00")), 3);
   // Missed 10/9 entirely -> broken on 10/10.
   assert.equal(computeStreak(gym, ph("2026-10-10T00:30:00")), 0);
+});
+
+test("weekday of a PH date", () => {
+  assert.equal(weekdayOf("2026-10-08"), 4); // Thursday
+  assert.equal(weekdayOf("2026-10-11"), 0); // Sunday
+  // 12:30 AM Friday in PH is still Thursday in UTC
+  assert.equal(weekdayOf(phIsoDate(ph("2026-10-09T00:30:00"))), 5);
 });

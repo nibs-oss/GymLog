@@ -51,6 +51,12 @@ export function daysBetweenIso(from: string, to: string): number {
   return Math.round((ms(to) - ms(from)) / 86_400_000);
 }
 
+/** Day of week for a YYYY-MM-DD date: 0 = Sunday … 6 = Saturday. */
+export function weekdayOf(iso: string): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+}
+
 /** Monday of the week containing the YYYY-MM-DD date (default: today in PH). */
 export function weekStartIso(iso: string = phIsoDate()): string {
   const [y, m, d] = iso.split("-").map(Number);

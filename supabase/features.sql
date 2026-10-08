@@ -1,7 +1,8 @@
 -- GymLog feature migration
 -- Run AFTER repair.sql, in Supabase dashboard -> SQL Editor. Safe to re-run.
 -- Adds: muscle groups, bodyweight log, decimal weights (for kg/lbs), optional weight/reps per set,
---       achievement de-duplication, all-or-nothing workout saving (save_workout).
+--       achievement de-duplication, all-or-nothing workout saving (save_workout),
+--       weekly plan (user_settings.schedule).
 
 begin;
 
@@ -21,6 +22,9 @@ begin
       add constraint sets_weight_or_reps check (weight is not null or reps is not null);
   end if;
 end $$;
+
+-- Weekly plan (Routines page): weekday "0" (Sun) … "6" (Sat) -> routine id or "rest"
+alter table public.user_settings add column if not exists schedule jsonb not null default '{}'::jsonb;
 
 -- Muscle group per exercise (routine template + logged copy)
 alter table public.routine_exercises add column if not exists muscle_group text;

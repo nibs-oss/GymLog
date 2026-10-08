@@ -1,5 +1,7 @@
 import { createClient as createServerClient } from "@/utils/supabase/server";
 import Link from "next/link";
+import { getUserSettings, DEFAULT_SETTINGS } from "@/lib/settings";
+import { WeeklyPlan } from "@/components/weekly-plan";
 
 /** Server component that fetches routines for the logged‑in user */
 async function fetchRoutines() {
@@ -10,7 +12,7 @@ async function fetchRoutines() {
   } = await supabase.auth.getUser();
   if (!user) {
     // Not authenticated – the middleware already redirects, but we guard anyway
-    return [];
+    return { routines: [], settings: DEFAULT_SETTINGS };
   }
 
   // Fetch routines belonging to this user, newest first
@@ -22,7 +24,7 @@ async function fetchRoutines() {
 
   if (error) {
     console.error("Error fetching routines:", error);
-    return [];
+    return { routines: [], settings: DEFAULT_SETTINGS };
   }
 
   // For each routine, fetch the number of associated exercises
@@ -36,7 +38,7 @@ async function fetchRoutines() {
     })
   );
 
-  return routinesWithCount;
+  return { routines: routinesWithCount, settings: await getUserSettings(supabase, user.id) };
 }
 
 function RoutineCard({ routine }: { routine: { id: string; name: string; created_at: string; exerciseCount: number } }) {
@@ -56,7 +58,7 @@ function RoutineCard({ routine }: { routine: { id: string; name: string; created
 }
 
 export default async function RoutinesPage() {
-  const routines = await fetchRoutines();
+  const { routines, settings } = await fetchRoutines();
 
   return (
     <section className="space-y-6">
@@ -86,6 +88,10 @@ export default async function RoutinesPage() {
             <RoutineCard key={routine.id} routine={routine} />
           ))}
         </div>
+      )}
+
+      {routines.length > 0 && (
+        <WeeklyPlan routines={routines.map((r) => ({ id: r.id, name: r.name }))} settings={settings} />
       )}
     </section>
   );
