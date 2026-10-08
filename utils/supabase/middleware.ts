@@ -37,7 +37,19 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isAuthPage = pathname === "/login" || pathname === "/signup";
+  const isAuthPage =
+    pathname === "/login" || pathname === "/signup" || pathname === "/forgot-password";
+
+  // Email links (password reset) sign the user in there, so let everyone through.
+  if (pathname.startsWith("/auth/")) return supabaseResponse;
+
+  // Opening /reset-password without a valid reset link: ask for a new link.
+  if (!user && pathname === "/reset-password") {
+    const url = request.nextUrl.clone();
+    url.pathname = "/forgot-password";
+    url.search = "?error=link";
+    return NextResponse.redirect(url);
+  }
 
   // Unauthenticated users are only allowed on the auth pages.
   if (!user && !isAuthPage) {
