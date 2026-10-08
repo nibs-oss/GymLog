@@ -20,6 +20,7 @@ declare
   r1 text; r2 text; re1 text; re2 text; re3 text;
   s1 text; s2 text; se1 text; se2 text;
   n int; v numeric; t text;
+  base date; -- test rows go before any real data (one log per day is enforced)
 begin
   select id into uid from auth.users
    where test_email is null or email = test_email
@@ -28,6 +29,10 @@ begin
     insert into hc_results(status, test, detail) values ('FAIL', 'find test user', 'no user found');
     return;
   end if;
+  select least(current_date,
+               (select min(date) from public.workout_sessions where user_id = uid),
+               (select min(date) from public.body_weights where user_id = uid)) - 400
+    into base;
 
   -- ---------------------------------------------------------------
   -- Part A: structure checks (as admin)
@@ -67,6 +72,10 @@ begin
   select data_type into t from information_schema.columns
    where table_schema = 'public' and table_name = 'sets' and column_name = 'weight';
   results := results || (case when t = 'numeric' then 'PASS' else 'FAIL' end || '|sets.weight allows decimals|type: ' || coalesce(t, 'missing'));
+
+  results := results || (case when to_regclass('public.workout_sessions_user_date_key') is not null
+                              then 'PASS|One log per day index exists|'
+                              else 'FAIL|One log per day index exists|missing: run repair.sql (lists any duplicate days)' end);
 
   -- ---------------------------------------------------------------
   -- Part B: act as the user and do what the app does (rolled back)
@@ -120,7 +129,7 @@ begin
     -- 4. Log a workout with decimal (lbs-converted) weights (log/[routineId])
     begin
       insert into public.workout_sessions (user_id, routine_id, date, is_rest_day)
-        values (uid, r1::uuid, current_date - 400, false) returning id::text into s1;
+        values (uid, r1::uuid, base, false) returning id::text into s1;
       insert into public.session_exercises (session_id, name, muscle_group, position)
         values (s1::uuid, 'Bench Press', 'Chest', 1) returning id::text into se1;
       insert into public.session_exercises (session_id, name, muscle_group, position)
@@ -136,7 +145,7 @@ begin
 
     -- 5. Edit a logged workout: change date, clear + re-insert exercises (history/[id])
     begin
-      update public.workout_sessions set date = current_date - 399 where id::text = s1;
+      update public.workout_sessions set date = base + 1 where id::text = s1;
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'date update changed % rows (missing UPDATE policy?)', n; end if;
       delete from public.sets where session_exercise_id::text in (se1, se2);
@@ -182,10 +191,10 @@ begin
     -- 8. Rest day (log/rest) and deleting it
     begin
       insert into public.workout_sessions (user_id, routine_id, date, is_rest_day)
-        values (uid, null, current_date - 398, true) returning id::text into s2;
+        values (uid, null, base + 2, true) returning id::text into s2;
       begin
         insert into public.workout_sessions (user_id, routine_id, date, is_rest_day)
-          values (uid, null, current_date - 398, false);
+          values (uid, null, base + 2, false);
         raise exception 'second log on the same date was allowed (run repair.sql step 5)';
       exception when unique_violation then
         null; -- expected: one log per day
@@ -226,13 +235,13 @@ begin
 
     -- 11. Bodyweight: save, overwrite same day, delete
     begin
-      insert into public.body_weights (user_id, date, weight) values (uid, current_date - 400, 70.5)
+      insert into public.body_weights (user_id, date, weight) values (uid, base, 70.5)
         on conflict (user_id, date) do update set weight = excluded.weight;
-      insert into public.body_weights (user_id, date, weight) values (uid, current_date - 400, 71.2)
+      insert into public.body_weights (user_id, date, weight) values (uid, base, 71.2)
         on conflict (user_id, date) do update set weight = excluded.weight;
-      select weight into v from public.body_weights where user_id = uid and date = current_date - 400;
+      select weight into v from public.body_weights where user_id = uid and date = base;
       if v <> 71.2 then raise exception 'weight is %', v; end if;
-      delete from public.body_weights where user_id = uid and date = current_date - 400;
+      delete from public.body_weights where user_id = uid and date = base;
       get diagnostics n = row_count;
       if n <> 1 then raise exception 'delete removed % rows', n; end if;
       results := results || ('PASS|Bodyweight save / overwrite / delete|');
